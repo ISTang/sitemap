@@ -1,0 +1,824 @@
+// Larbin
+// Sebastien Ailleret
+// 07-12-01 -> 07-12-01
+
+#include <iostream>
+#include <string.h>
+#include <unistd.h>
+#include <vector>
+#include <iconv.h>
+
+#include "options.h"
+
+#include "types.h"
+#include "global.h"
+#include "fetch/file.h"
+#include "utils/text.h"
+#include "utils/debug.h"
+#include "interf/output.h"
+
+#include "../../hiredis/hiredis.h"
+
+#ifdef SAVEFAILED
+static const char* failedReason[] = {
+  "success",
+  "noDNS",
+  "noConnection",
+  "forbiddenRobots",
+  "timeout",
+  "badType",
+  "tooBig",
+  "err30X",
+  "err40X",
+  "earlyStop",
+  "duplicate",
+  "fastRobots",
+  "fastNoConnv",
+  "fastNoDns",
+  "tooDeep",
+  "urlDup"
+};
+#endif // SAVEFAILED
+
+static const char* linkTypes[] = {
+  "??",
+  "base",
+  "anchor",
+  "script",
+  "link",
+  "frame",
+  "iframe",
+  "image"
+};
+
+#ifdef SAVEPAGE
+static char *fileName;
+static uint endFileName;
+#endif // SAVEPAGE
+
+#define MAX_ENCODING 20
+#define MAX_TITLE 2048
+
+/*static char *strcasestr(const char *arg1, const char *arg2)
+{                  
+   const char *a, *b;
+                   
+   for(;*arg1;*arg1++) {
+                   
+     a = arg1;
+     b = arg2;
+     
+     while((*a++ | 32) == (*b++ | 32))
+       if(!*b) 
+         return (arg1);
+     
+   }
+     
+   return(NULL);
+}*/
+
+/** A page has been loaded successfully
+ * @param page the page that has been fetched
+ */
+void loaded (html *page) {
+  // Here should be the code for managing everything
+  // page->getHeaders() gives a char* containing the http headers
+  // page->getPage() gives a char* containing the page itself
+  // those char* are statically allocated, so you should copy
+  // them if you want to keep them
+  // in order to accept \000 in the page, you can use page->getLength()
+#ifdef BIGSTATS
+  std::cout << "fetched : ";
+  page->getUrl()->print();
+  std::cout << page->getHeaders() << "\n" << page->getPage() << "\n";
+#endif // BIGSTATS
+
+  redisContext *c;
+  redisReply *reply;
+
+  struct timeval timeout = { 1, 500000 }; // 1.5 seconds
+  c = redisConnectWithTimeout((char*)"127.0.0.1", 6379, timeout);
+  if (c == NULL || c->err) {
+    if (c) {
+      std::cerr<<"连接数据库失败: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+      redisFree(c);
+    } else {
+      std::cerr<<"连接数据库失败: 不能分配 redis 上下文"<<std::endl;
+    }
+    exit(1);
+    return;
+  }
+
+  // Persist to db
+  char *pageUrl = page->getUrl()->giveUrl();
+
+  // skip duplicate page
+#ifndef NDEBUG
+  std::cout<<"Checking page url: "<<pageUrl<<std::endl;
+#endif
+  bool pageExists;
+  reply = (redisReply*)redisCommand(c,"EXISTS page:%s", pageUrl);
+  if (reply==NULL) {
+    std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+    exit(2);
+    return;
+  }
+  pageExists = (reply->integer==1);
+  freeReplyObject(reply);
+
+  if (pageExists) {
+#ifndef NDEBUG
+    std::cerr<<"Page url "<<pageUrl<<" exists"<<std::endl;
+#endif
+    redisFree(c);
+    return;
+  }
+
+  // detect page encoding
+  char pageEncoding[MAX_ENCODING+1];
+  memset(pageEncoding, 0, sizeof pageEncoding);
+  char *pContentTypeBegin = strcasestr(page->getPage(), "<meta http-equiv=\"Content-Type\" content=\"");
+  if (pContentTypeBegin) {
+    pContentTypeBegin += 41;
+    char *pContentTypeEnd = strcasestr(pContentTypeBegin, "\"");
+    if (pContentTypeEnd) {
+      char *contentType = new char[pContentTypeEnd-pContentTypeBegin+1];
+      memset(contentType, 0, pContentTypeEnd-pContentTypeBegin+1);
+      strncpy(contentType, pContentTypeBegin, pContentTypeEnd-pContentTypeBegin);
+      //
+      char *pCharsetBegin = strcasestr(contentType, "charset=");
+      if (pCharsetBegin) {
+        pCharsetBegin += 8;
+        char *pCharsetEnd = strchr(pCharsetBegin, ';');
+        if (!pCharsetEnd) pCharsetEnd = pCharsetBegin+strlen(contentType);
+        if (strncmp(pCharsetBegin, "text/html", 9)) {
+          strncpy(pageEncoding, pCharsetBegin, std::min(MAX_ENCODING, pCharsetEnd-pCharsetBegin));
+        }
+      }
+      delete[] contentType;
+#ifndef NDEBUG
+      std::cout<<"Page encoding of url "<<pageUrl<<": "<<pageEncoding<<std::endl;
+#endif // NDEBUG
+    }
+  } else {
+    char *pCharsetBegin = strcasestr(page->getPage(), "<meta charset=\"");
+    if (pCharsetBegin) {
+      pCharsetBegin += 15;
+      char *pCharsetEnd = strchr(pCharsetBegin, '\"');
+      if (pCharsetEnd) {
+        strncpy(pageEncoding, pCharsetBegin, std::min(MAX_ENCODING, pCharsetEnd-pCharsetBegin));
+      }
+    }
+  }
+  
+  // page title
+#ifndef NDEBUG
+  std::cout<<"Getting page title for url: "<<pageUrl<<std::endl;
+#endif
+  char *pageTitle = NULL;
+  char *p = strcasestr(page->getPage(), "<title>");
+  if (p) {
+    char *q = strcasestr(p+7, "</title>");
+    if (q) {
+      pageTitle = new char[q-p-7+1];
+      strncpy(pageTitle, p+7, q-p-7);
+      *(pageTitle+(q-p-7)) = '\0'; 
+    }
+  }
+  if (pageTitle) {
+    if (*pageEncoding!='\0' && strcasecmp(pageEncoding, "utf-8")) {
+      iconv_t hIconv = iconv_open("UTF-8", pageEncoding);
+      if (-1 == (int)hIconv ) {
+        std::cerr<<"Cannot convert page title from "<<pageEncoding<<" to UTF-8 for url "<<pageUrl<<std::endl;
+        //exit(3);
+      } else {
+        char inBuf[MAX_TITLE+1];
+        char outBuf[MAX_TITLE*2+1];
+        memset(inBuf, 0, sizeof inBuf);
+        memset(outBuf, 0, sizeof outBuf);
+        strncpy(inBuf, pageTitle, MAX_TITLE);
+        size_t inLen = strlen(inBuf);
+        size_t outLen = sizeof outBuf - 1;
+        char *s = inBuf;
+        char *d = outBuf;
+        iconv(hIconv, (char**)(&s), &inLen, (char**)(&d), &outLen);
+
+        delete[] pageTitle;
+        pageTitle = new char[outLen+1];
+        strcpy(pageTitle, outBuf);
+
+        iconv_close( hIconv );
+     }
+   }
+
+#ifndef NDEBUG
+    std::cout<<"Saving page title for url: "<<pageUrl<<std::endl;
+#endif
+    reply = (redisReply*)redisCommand(c,"HSET page:%s %s %s", pageUrl, "title", pageTitle);
+    if (reply==NULL) {
+      std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+      exit(2);
+      return;
+    }
+    freeReplyObject(reply);
+    delete[] pageTitle;
+  }
+
+  /*// page depth
+#ifndef NDEBUG
+    std::cout<<"Saving page depth for url: "<<pageUrl<<std::endl;
+#endif
+  reply = (redisReply*)redisCommand(c,"HSET page:%s %s %u", pageUrl, "depth", page->getUrl()->getDepth());
+  if (reply==NULL) {
+    std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+    exit(2);
+    return;
+  }
+  freeReplyObject(reply);*/
+
+#ifdef SAVEPAGE
+  // page headers
+#ifndef NDEBUG
+  std::cout<<"Saving page headers for url: "<<pageUrl<<std::endl;
+#endif
+  reply = (redisReply*)redisCommand(c,"HSET page:%s %s %s", pageUrl, "headers", page->getHeaders());
+  if (reply==NULL) {
+    std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+    exit(2);
+    return;
+  }
+  freeReplyObject(reply);
+
+  // save page body
+#ifndef NDEBUG
+  std::cout<<"Saving page content for url: "<<pageUrl<<std::endl;
+#endif
+  nbfile++;
+  if (nbfile < filesPerDir) {
+    int tmp = nbfile;
+    int pos = endFileName;
+    while (tmp != 0) {
+      fileName[pos--] = '0' + (tmp % 10);
+      tmp /= 10;
+    }
+  } else { // new dir
+    // create the directory
+    nbdir++; nbfile = 0;
+    int pos = endFileName-7;
+    int tmp = nbdir;
+    while (tmp != 0) {
+      fileName[pos--] = '0' + (tmp % 10);
+      tmp /= 10;
+    }
+    fileName[endFileName-6] = 0;
+    if (mkdir(fileName, S_IRWXU) != 0) perror("trouble while creating dir");
+    fileName[endFileName-6] = '/';
+    // open new index
+    close(indexFds);
+    strcpy(fileName+endFileName-5, "index");
+    indexFds = creat(fileName, S_IRWXU);
+    if (indexFds < 0) {
+      std::cerr << "cannot open file " << fileName << "\n";
+      exit(1);
+    }
+    // new filename
+    fileName[endFileName-5] = 'f';
+    for (uint i=endFileName; i>endFileName-5; i--) fileName[i]='0';
+  }
+  int fd = creat(fileName, S_IRWXU);
+  if (fd < 0) {
+    std::cerr << "cannot open file " << fileName << "\n";
+    exit(1);
+  }
+  int s=0;
+  s = sprintf(buf, "%4u ", nbfile);
+#ifdef URL_TAGS
+  s += sprintf(buf+s, "(%u) ", page->getUrl()->tag);
+#endif // URL_TAGS
+  s += page->getUrl()->writeUrl(buf+s);
+  buf[s++] = '\n';
+  ecrireBuff(indexFds, buf, s);
+  ecrireBuff(fd, page->getPage(), page->getLength());
+  close(fd);
+
+#ifndef NDEBUG
+  std::cout<<"Saving page body for url: "<<pageUrl<<std::endl;
+#endif
+  reply = (redisReply*)redisCommand(c,"HSET page:%s %s %s", pageUrl, "body", fileName);
+  if (reply==NULL) {
+    std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+    exit(2);
+    return;
+  }
+  freeReplyObject(reply);
+#endif // SAVEPAGE
+
+  if (page->getUrl()->tag > 0) {
+
+    // page url count
+#ifndef NDEBUG
+    std::cout<<"Getting home page count..."<<std::endl;
+#endif
+    reply = (redisReply*)redisCommand(c,"ZCARD %s", "pages");
+    if (reply==NULL) {
+      std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+      exit(2);
+      return;
+    }
+    int homepageCount = reply->integer;
+    freeReplyObject(reply);
+
+    // page url set
+#ifndef NDEBUG
+    std::cout<<"Saving page url "<<pageUrl<<" to set"<<std::endl;
+#endif
+    reply = (redisReply*)redisCommand(c,"ZADD %s %u %s", "pages", homepageCount+1, pageUrl);
+    if (reply==NULL) {
+      std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+      exit(2);
+      return;
+    }
+    freeReplyObject(reply);
+
+#ifdef URL_TAGS
+    // enable find page url by tag
+#ifndef NDEBUG
+    std::cout<<"Saving page url for tag: "<<page->getUrl()->tag<<std::endl;
+#endif
+    reply = (redisReply*)redisCommand(c,"SADD tag:%u %s", page->getUrl()->tag, pageUrl);
+    if (reply==NULL) {
+      std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+      exit(2);
+      return;
+    }
+    freeReplyObject(reply);
+
+    // enable find tag by page url
+#ifndef NDEBUG
+    std::cout<<"Saving page tag for url: "<<pageUrl<<std::endl;
+#endif
+    reply = (redisReply*)redisCommand(c,"HSET page:%s %s %u", pageUrl, "tag", page->getUrl()->tag);
+    if (reply==NULL) {
+      std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+      exit(2);
+      return;
+    }
+    freeReplyObject(reply);
+#endif // URL_TAGS
+  }
+
+#ifdef LINKS_INFO
+  Vector<LinkInfo> *links = page->getLinks();
+  for (unsigned i=0; i<links->getLength(); i++) {
+
+    LinkInfo *linkInfo = (*links)[i];
+    char *linkUrl = linkInfo->url;
+    TagType linkType = linkInfo->type;
+
+    // follow links
+    if (strcmp(pageUrl, linkUrl)!=0) {
+
+#ifndef NDEBUG
+      std::cout<<"Getting link count for page url: "<<pageUrl<<std::endl;
+#endif
+      reply = (redisReply*)redisCommand(c,"ZCARD links_of_%s", pageUrl);
+      if (reply==NULL) {
+        std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+        exit(2);
+        return;
+      }
+      int linkCount = reply->integer;
+      freeReplyObject(reply);
+
+#ifndef NDEBUG
+      std::cout<<"Saving link "<<linkUrl<<" for page url: "<<pageUrl<<std::endl;
+#endif
+      reply = (redisReply*)redisCommand(c,"ZADD links_of_%s %u %s", pageUrl, linkCount+1, linkUrl);
+      if (reply==NULL) {
+        std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+        exit(2);
+        return;
+      }
+      freeReplyObject(reply);
+
+      // link type
+#ifndef NDEBUG
+      std::cout<<"Saving link type for url: "<<linkUrl<<std::endl;
+#endif
+      reply = (redisReply*)redisCommand(c,"SET linktype:%s %s", linkUrl, linkTypes[(int)linkType]);
+      if (reply==NULL) {
+        std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+        exit(2);
+        return;
+      }
+      freeReplyObject(reply);
+
+#ifdef URLREVERSE
+      // follow reverse link
+#ifndef NDEBUG
+      std::cout<<"Getting link referer count for link url: "<<linkUrl<<std::endl;
+#endif
+      reply = (redisReply*)redisCommand(c,"ZCARD referring_%s", linkUrl);
+      if (reply==NULL) {
+        std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+        exit(2);
+        return;
+      }
+      int refererCount = reply->integer;
+      freeReplyObject(reply);
+
+      // follow reverse link
+#ifndef NDEBUG
+      std::cout<<"Saving link referer: "<<linkUrl<<"for page url: "<<pageUrl<<std::endl;
+#endif
+      reply = (redisReply*)redisCommand(c,"ZADD referring_%s %u %s", linkUrl, refererCount, pageUrl);
+      if (reply==NULL) {
+        std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+        exit(2);
+        return;
+      }
+      freeReplyObject(reply);
+#endif // URLREVERSE
+
+    }
+
+    delete[] linkUrl;
+    //delete linkInfo;
+  }
+#endif // LINKS_INFO
+
+  delete[] pageUrl;
+
+  redisFree(c);
+}
+
+/** The fetch failed
+ * @param u the URL of the doc
+ * @param reason reason of the fail
+ */
+void failure (url *u, FetchError reason) {
+  // Here should be the code for managing everything
+#ifdef BIGSTATS
+  std::cout << "fetched failed (" << (int)reason << ") : ";
+  u->print();
+#endif // BIGSTATS
+
+#ifdef SAVEFAILED
+  redisContext *c;
+  redisReply *reply;
+
+  struct timeval timeout = { 1, 500000 }; // 1.5 seconds
+  c = redisConnectWithTimeout((char*)"127.0.0.1", 6379, timeout);
+  if (c == NULL || c->err) {
+    if (c) {
+      std::cerr<<"连接数据库失败: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+      redisFree(c);
+    } else {
+      std::cerr<<"连接数据库失败: 不能分配 redis 上下文"<<std::endl;
+    }
+    exit(1);
+    return;
+  }
+
+  char *url = u->giveUrl();
+
+#ifndef NDEBUG
+  std::cout<<"Getting failed page url count"<<std:endl;
+#endif
+  reply = (redisReply*)redisCommand(c,"ZCARD %s", "failedurls");
+  if (reply==NULL) {
+    std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+    exit(2);
+    return;
+  }
+  int failedCount = reply->integer;
+  freeReplyObject(reply);
+
+#ifndef NDEBUG
+  std::cout<<"Saving failed page url: "<<url<<std::endl;
+#endif
+  reply = (redisReply*)redisCommand(c,"ZADD %s %u %s", "failedurls", failedCount, url);
+  if (reply==NULL) {
+    std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+    exit(2);
+    return;
+  }
+  freeReplyObject(reply);
+
+#ifndef NDEBUG
+  std::cout<<"Saving load failed reason for page url: "<<url<<std::endl;
+#endif
+  reply = (redisReply*)redisCommand(c,"HSET page:%s %s %s", url, "failedreason", failedReason[(int)reason]);
+  if (reply==NULL) {
+    std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+    exit(2);
+    return;
+  }
+  freeReplyObject(reply);
+
+  delete url;
+
+  redisFree(c);
+#endif // SAVEFAILED
+}
+
+/** initialisation function
+ */
+void initUserOutput () {
+#ifdef SAVEPAGE
+  mkdir(saveDir, S_IRWXU);
+  endFileName = strlen(saveDir);
+  fileName = new char[endFileName+maxUrlSize+50];
+  strcpy(fileName, saveDir);
+  if (fileName[endFileName-1] != '/') fileName[endFileName++] = '/';
+  strcpy(fileName+endFileName, "d00000/");
+  endFileName += 7; // indique le premier char a ecrire
+#endif // SAVEPAGE
+}
+
+static void outputPage(redisContext *c, int fds, int pageIndex, char *pageUrl, int indent, std::vector<const char*>& pageUrlStack, bool homepage, bool handleChildPages);
+
+static void outputPageLinks(redisContext *c, int fds, char *pageUrl, int indent, std::vector<const char*>& pageUrlStack) {
+  redisReply *reply;
+
+#ifndef NDEBUG
+  std::cout<<"Getting link count of page for url: "<<pageUrl<<std::endl;
+#endif
+  reply = (redisReply*)redisCommand(c,"ZCARD links_of_%s", pageUrl);
+  if (reply==NULL) {
+    std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+    ecrire(fds, "<p>有错误发生：<strong>");
+    ecrire(fds, c->errstr);
+    ecrire(fds, "</strong></p>");
+    return;
+  }
+  int pageLinkCount = reply->integer;
+  freeReplyObject(reply);
+
+#ifndef NDEBUG
+  std::cout<<"Getting links of page for url: "<<pageUrl<<std::endl;
+#endif
+  reply = (redisReply*)redisCommand(c,"ZRANGE links_of_%s %u %u", pageUrl, 1, pageLinkCount);
+  if (reply==NULL) {
+    std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+    ecrire(fds, "<p>有错误发生：<strong>");
+    ecrire(fds, c->errstr);
+    ecrire(fds, "</strong></p>");
+    return;
+  }
+
+  int linkCount = reply->elements;
+#ifndef NDEBUG
+  std::cout<<"Total "<<linkCount<<" links, for page url: "<<pageUrl<<std::endl;
+#endif
+  char* *linkUrls = new char *[linkCount];
+  for (int i=0; i<linkCount; i++) {
+    char *linkUrl = reply->element[i]->str;
+    linkUrls[i] = newString(linkUrl);
+  }
+
+  freeReplyObject(reply);
+
+  Vector<char> pageUrls;
+#ifdef OUTLINKS
+  int linkIndex = 1;
+#endif // OUTLINKS
+  for (int i=0; i<linkCount; i++) {
+    char *linkUrl = linkUrls[i];
+
+#ifndef NDEBUG
+    std::cout<<"Getting link type for url: "<<linkUrl<<std::endl;
+#endif
+    reply = (redisReply*)redisCommand(c,"GET linktype:%s", linkUrl);
+    if (reply==NULL) {
+      std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+      ecrire(fds, "<p>有错误发生：<strong>");
+      ecrire(fds, c->errstr);
+      ecrire(fds, "</strong></p>");
+      return;
+    }
+    char *type = newString(reply->str);    
+    freeReplyObject(reply);
+
+    if (type && (!strcmp(type, "anchor")||!strcmp(type, "iframe")||!strcmp(type, "frame"))) {
+      pageUrls.addElement(newString(linkUrl));
+#ifdef OUTLINKS
+    } else {
+#ifndef NDEBUG
+      std::cout<<"Link #"<<linkIndex<<": "<<linkUrl<<std::endl;
+#endif
+      ecrire(fds, "<br>");
+      for (int i=0; i<indent*2; i++) ecrire(fds, "&nbsp;");
+      ecrire(fds, "#");
+      ecrireInt(fds, linkIndex);
+      ecrire(fds, ": [");
+      ecrire(fds, type);
+      ecrire(fds, "] <a href=\"");
+      ecrire(fds, linkUrl);
+      ecrire(fds, "\">");
+      ecrire(fds, linkUrl);
+      ecrire(fds, "</a>");
+      ecrire(fds, "</br>");
+      linkIndex++;
+#endif // OUTLINKS
+    }
+    delete[] type;
+    
+    delete[] linkUrl;
+  }
+  delete[] linkUrls;
+
+  int pageIndex = 1;
+  for (unsigned i=0; i<pageUrls.getLength(); i++) {
+    bool rescure = false;
+    std::vector<const char*>::const_iterator it=pageUrlStack.begin();
+    for (; it!=pageUrlStack.end(); it++) {
+      if (!strcmp(*it, pageUrls[i])) {
+        rescure = true;
+        break;
+      }
+    }
+    if (!rescure) {
+      outputPage(c, fds, pageIndex++, pageUrls[i], indent, pageUrlStack, false, true);
+    }
+  }
+}
+
+static void outputPage(redisContext *c, int fds, int pageIndex, char *pageUrl, int indent, std::vector<const char*>& pageUrlStack, bool homepage, bool handleChildPages) {
+  redisReply *reply;
+
+#ifndef NDEBUG
+  std::cout<<"Page #"<<pageIndex<<": "<<pageUrl<<std::endl;
+#endif
+  ecrire(fds, "<p>");
+  for (int i=0; i<indent*2; i++) ecrire(fds, "&nbsp;");
+  ecrire(fds, (char *)(homepage?"站点":"页面"));
+  if (pageIndex) ecrireInt(fds, pageIndex);
+  ecrire(fds, ": ");
+
+#ifndef NDEBUG
+  std::cout<<"Getting page info for url: "<<pageUrl<<std::endl;
+#endif
+  reply = (redisReply*)redisCommand(c,"HGETALL page:%s", pageUrl);
+  if (reply==NULL) {
+    std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+    ecrire(fds, pageUrl);
+    ecrire(fds, "</p><p>有错误发生：<strong>");
+    ecrire(fds, c->errstr);
+    ecrire(fds, "</strong></p>");
+    return;
+  }
+
+  char *title = NULL;
+  char *tag = NULL;
+  char *depth = NULL;
+  for (int i=0; i<reply->elements; i+=2) {
+    char *fieldName = reply->element[i]->str;
+    char *fieldValue = reply->element[i+1]->str;
+    if (!strcmp(fieldName, "title")) {
+#ifndef NDEBUG
+      std::cout<<"Title for page "<<pageUrl<<": "<<fieldValue<<std::endl;
+#endif
+      title = newString(fieldValue);
+    } else if (!strcmp(fieldName, "tag")) {
+#ifndef NDEBUG
+      std::cout<<"Tag for page "<<pageUrl<<": "<<fieldValue<<std::endl;
+#endif
+      tag = newString(fieldValue);
+    }/* else if (!strcmp(fieldName, "depth")) {
+#ifndef NDEBUG
+      std::cout<<"Depth for page "<<pageUrl<<": "<<fieldValue<<std::endl;
+#endif
+      depth = newString(fieldValue);
+    }*/
+  }
+
+  ecrire(fds, "<a target=\"_blank\" href=\"");
+  ecrire(fds, pageUrl);
+  ecrire(fds, "\"");
+  if (tag) {
+    ecrire(fds, " title=\"tag: ");
+    ecrire(fds, tag);
+    ecrire(fds, "\"");
+    delete[] tag;
+  }
+  ecrire(fds, ">");
+  if (title) {
+    ecrire(fds, title);
+    delete[] title;
+  } else {
+    ecrire(fds, pageUrl);
+  }
+  ecrire(fds, "</a>");
+  /*if (depth) {
+    ecrire(fds, ", depth=");
+    ecrire(fds, depth);
+    delete[] depth;
+  }*/
+  if (homepage) {
+    ecrire(fds, "&nbsp;&nbsp;");
+    ecrire(fds, "<a target=\"_blank\" href=\"/output.html?");
+    ecrire(fds, pageUrl);
+    ecrire(fds, "\">");
+    ecrire(fds, "详细");
+    ecrire(fds, "</a>");
+  }
+  ecrire(fds, "</p>");
+
+  freeReplyObject(reply);
+
+  if (indent+1<=OUTDEPTH && handleChildPages) {
+    pageUrlStack.push_back(pageUrl);
+    outputPageLinks(c, fds, pageUrl, indent+1, pageUrlStack);
+    pageUrlStack.pop_back();
+  }
+}
+
+/** stats, called in particular by the webserver
+ * the webserver is in another thread, so be careful
+ * However, if it only reads things, it is probably not useful
+ * to use mutex, because incoherence in the webserver is not as critical
+ * as efficiency
+ */
+void outputStats(int fds, const char *queryParams) {
+  struct timeval timeout = { 1, 500000 }; // 1.5 seconds
+  redisContext *c = redisConnectWithTimeout((char*)"127.0.0.1", 6379, timeout);
+  if (c == NULL || c->err) {
+    if (c) {
+      ecrire(fds, "连接数据库失败: ");
+      ecrire(fds, c->errstr);
+      ecrire(fds, "\n");
+      redisFree(c);
+    } else {
+      ecrire(fds, "连接数据库失败: 不能分配 redis 上下文\n");
+    }
+    return;
+  }
+
+  std::vector<const char *> pageUrlStack;
+
+  if (queryParams) {
+#ifndef NDEBUG
+    std::cout<<"outputStats: "<<queryParams<<std::endl;
+#endif
+    ecrire(fds, "</pre>");
+    outputPage(c, fds, 0, (char *)queryParams, 0, pageUrlStack, true, true);
+    ecrire(fds, "<pre>");
+    return;
+  }
+
+  ecrire(fds, "</pre>");
+
+#ifndef NDEBUG
+  std::cout<<"Getting site count..."<<std::endl;
+#endif
+  redisReply *reply = (redisReply*)redisCommand(c,"ZCARD pages");
+  if (reply==NULL) {
+    std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+    ecrire(fds, c->errstr);
+    ecrire(fds, "\n<pre>");
+    return;
+  }
+  int homepageCount = reply->integer;
+  freeReplyObject(reply);
+
+#ifndef NDEBUG
+  std::cout<<"Getting all sites..."<<std::endl;
+#endif
+  reply = (redisReply*)redisCommand(c,"ZRANGE pages %u %u", 1, homepageCount);
+  if (reply==NULL) {
+    std::cerr<<"redisCommand: "<<c->errstr<<"("<<c->err<<")"<<std::endl;
+    ecrire(fds, c->errstr);
+    ecrire(fds, "\n<pre>");
+    return;
+  }
+  
+  int pageCount = reply->elements;
+#ifndef NDEBUG
+  std::cout<<"Total "<<pageCount<<" sites..."<<std::endl;
+#endif
+  ecrire(fds, "<p>总共 <strong>");
+  ecrireInt(fds, pageCount);
+  ecrire(fds, "</strong> 个站点。</p>");
+
+  char* *pageUrls = new char*[pageCount];
+  for (int i=0; i<pageCount; i++) {
+    char *pageUrl = reply->element[i]->str;
+    pageUrls[i] = newString(pageUrl);
+  }  
+
+  freeReplyObject(reply);
+
+  for (int i=0; i<pageCount; i++) {
+    char *pageUrl = pageUrls[i];
+    outputPage(c, fds, i+1, pageUrl, 0, pageUrlStack, true, false);
+
+    delete[] pageUrl;
+  }
+  delete[] pageUrls;
+
+  ecrire(fds, "<pre>");
+
+  redisFree(c);
+}
+
