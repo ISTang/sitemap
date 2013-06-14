@@ -7,7 +7,7 @@
 // 引入依赖包
 var fs = require('fs');
 var async = require('async');
-var _redis = require("redis");
+var mongo = require('mongodb');
 var hashes = require('hashes');
 var url = require('url');
 //
@@ -18,16 +18,17 @@ exports.getAllSites = getAllSites;
 exports.getPages = getPages;
 exports.getResources = getResources;
 
-const REDIS_SERVER = config.REDIS_SERVER;
-const REDIS_PORT = config.REDIS_PORT;
+const MONGO_SERVER = config.MONGO_SERVER;
+const MONGO_PORT = config.MONGO_PORT;
 //
 const LOG_ENABLED = config.LOG_ENABLED;
 
 var logStream = LOG_ENABLED ? fs.createWriteStream("logs/db.log", {"flags": "a"}) : null;
 
-var redis;
+var db;
 
 String.prototype.contains = utils.contains;
+Date.prototype.Format = utils.DateFormat;
 
 /*
  * Print log
@@ -467,8 +468,15 @@ function main(fn) {
 
 void main(function () {
 
-    redis = _redis.createClient(REDIS_PORT, REDIS_SERVER);
-    redis.on("error", function (err) {
-        log("Error " + err);
+    db = new mongo.Db("sitemap", new mongo.Server(MONGO_SERVER, MONGO_PORT), {safe:false});
+
+    log("正在连接数据库...");
+    db.open(function(err, p_client) {
+      if (err) {
+        log(err);
+        process.exit(1);
+        return;
+      }
+      log("已连接到数据库。");
     });
 });
