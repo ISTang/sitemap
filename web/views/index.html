@@ -1,0 +1,178 @@
+<% include header.html %>
+
+<div data-dojo-type="dijit/layout/BorderContainer" data-dojo-props="design: 'headline'"
+     id="appLayout">
+    <div data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region: 'top'"
+         id="banner" class="edgePanel">
+        <!--网站元素分析系统-->
+    </div>
+    <div data-dojo-type="dijit/layout/BorderContainer" id="navigation" class="edgePanel"
+         data-dojo-props="region: 'left', splitter: true">
+        <div data-dojo-type="dijit/layout/BorderContainer" id="findSite"
+             data-dojo-props="region: 'top'">
+            <div data-dojo-type="dijit/layout/ContentPane" id="findLeft"
+                 data-dojo-props="region: 'left'">
+            </div>
+            <div data-dojo-type="dijit/layout/ContentPane" id="siteToFind"
+                 data-dojo-props="region: 'center'">
+                <input data-dojo-type="dijit/form/TextBox" id="txtSiteToFind"
+                       data-dojo-props="trim:true"
+                       type="text" value="" style="background:transparent;height:20px;margin-top:3px;border:0"/>
+            </div>
+            <div data-dojo-type="dijit/layout/ContentPane" id="siteFind"
+                 data-dojo-props="region: 'right'">
+                <button data-dojo-type="dijit/form/Button"
+                        data-dojo-props="iconClass:'findIcon', showLabel: false"
+                        id="doSiteFind" type="button">查找
+                    <script type="dojo/on" data-dojo-event="click" data-dojo-args="evt">
+                        if (txtSiteToFind.value=="") return;
+
+                        var sites = myTree.rootNode.getChildren();
+                        for (var i in sites) {
+                            var site = sites[i];
+                            if (site.item.name.contains(txtSiteToFind.value, true)) {
+                                pageUrl.set("content", "<strong>"+site.item.name+"</strong>");
+                                myTree.set("paths", [["root", site.item.id]]).then(function(){myTree.focus()});
+                                break;
+                            }
+                        }
+                    </script>
+                </button>
+            </div>
+        </div>
+        <div data-dojo-type="dijit/layout/ContentPane" id="pageTree"
+             data-dojo-props="region: 'center'">
+            <!-- Create the store -->
+            <div data-dojo-type="dojo/store/JsonRest" data-dojo-id="pagesStore"
+                 data-dojo-props="target: '/pages/'">
+                <script type="dojo/method" data-dojo-event="getChildren" data-dojo-args="object">
+                    return this.get(object.id).then(function(fullObject){
+                        return fullObject.children;
+                    });
+                </script>
+            </div>
+            <!-- Create the model bridging the store and the Tree -->
+            <div data-dojo-type="dijit/tree/ObjectStoreModel" data-dojo-id="pagesModel"
+                 data-dojo-props="store: pagesStore">
+                <script type="dojo/method" data-dojo-event="getRoot" data-dojo-args="onItem">
+                    this.store.get("root").then(onItem);
+                </script>
+                <script type="dojo/method" data-dojo-event="mayHaveChildren" data-dojo-args="object">
+                    return "children" in object;
+                </script>
+            </div>
+            <!-- Create the tree -->
+            <div data-dojo-type="dijit/Tree"data-dojo-id="myTree" id="myTree"
+                 data-dojo-props="model: pagesModel, persist: false, showRoot: false">
+                <script type="dojo/on" data-dojo-event="click" data-dojo-args="item, node, evt">
+                    pageUrl.set("content", "<strong>"+node.label+"</strong>");
+                </script>
+            </div>
+        </div>
+        <div data-dojo-type="dijit/layout/ContentPane" id="treeBackground"
+             data-dojo-props="region: 'bottom'">
+        </div>
+    </div>
+    <div data-dojo-type="dijit/layout/BorderContainer" id="workspace"
+         data-dojo-props="region: 'center'"
+         class="centerPanel">
+        <div data-dojo-type="dijit/layout/BorderContainer" id="searchForUrl"
+             data-dojo-props="region: 'top'">
+            <div data-dojo-type="dijit/layout/ContentPane" data-dojo-id="pageUrl" id="pageUrl"
+                 data-dojo-props="region: 'center'">
+                请先从左边页面树中选中一个页面，然后点击搜索按钮...
+            </div>
+            <div data-dojo-type="dijit/layout/BorderContainer" id="searchUrl"
+                 data-dojo-props="region: 'right'">
+                <div data-dojo-type="dijit/layout/ContentPane" id="searchLeft"
+                     data-dojo-props="region: 'left'"
+                     style="margin-left: 0px">
+                </div>
+                <div data-dojo-type="dijit/layout/ContentPane" id="urlToSearch"
+                     data-dojo-props="region: 'center'">
+                    <input data-dojo-type="dijit/form/TextBox" data-dojo-id="urlToSearch" id="txtUrlToSearch"
+                           data-dojo-props="trim:true"
+                           type="text" value="" style="width: 220px;border: 0"/>
+                </div>
+                <div data-dojo-type="dijit/layout/ContentPane" id="urlSearch"
+                     data-dojo-props="region: 'right'">
+                    <button data-dojo-type="dijit/form/Button"
+                            id="doUrlSearch" type="button">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                        <script type="dojo/on" data-dojo-event="click" data-dojo-args="evt">
+                            if (!myTree.selectedItems[0]) return;
+
+                            var widget = dijit.byId("urlTable");
+                            if (widget) widget.destroy(true);
+
+                            require([
+                                "dojo/store/JsonRest",
+                                "dojo/store/Memory",
+                                "dojo/store/Cache",
+                                "dojox/grid/DataGrid",
+                                "dojo/data/ObjectStore",
+                                "dojo/query",
+                                "dojo/domReady!"
+                            ], function(JsonRest, Memory, Cache, DataGrid, ObjectStore, query){
+                                var myStore, dataStore, grid;
+                                myStore = new Cache(JsonRest({target:"/resources/"+myTree.selectedItems[0].id+
+                                    "?includeChildPages="+includeChildPages.get("value")+"&includedUrlString="+escape(urlToSearch.value)}), new Memory());
+                                grid = new DataGrid({
+                                    store: dataStore = new ObjectStore({objectStore: myStore}),
+                                    structure: [
+                                        {name:"序号", field:"row", width: "32px"},
+                                        {name:"URL", field:"url", width: "auto"},
+                                        {name:"类型", field:"type", width: "48px"}
+                                    ]
+                                    }, "urlTable"); // make sure you have a target HTML element with this id
+                                grid.startup();
+                            });
+                        </script>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div data-dojo-type="dijit/layout/ContentPane"
+             data-dojo-props="region: 'center'"
+             id="urlTableContainer">
+            <div id="urlTable"></div>
+       </div>
+        <div data-dojo-props="region: 'bottom'" id="urlActions"
+             data-dojo-type="dijit/layout/BorderContainer">
+            <div data-dojo-type="dijit/layout/ContentPane" id="includeChildPages"
+                 data-dojo-props="region: 'center'">
+                <input data-dojo-type="dijit/form/CheckBox" data-dojo-id="includeChildPages"
+                       id="chkIncludeChildPages"
+                       name="includeChildPages" value="true" checked/>
+                <label for="includeChildPages"">包含子页面中的资源</label>
+            </div>
+            <div data-dojo-type="dijit/layout/ContentPane" id="exportUrls"
+                 data-dojo-props="region: 'right'">
+                <button data-dojo-type="dijit/form/Button" data-dojo-props="iconClass:'exportIcon', showLabel: false"
+                        id="doExportUrls" type="button">导出
+                    <script type="dojo/on" data-dojo-event="click" data-dojo-args="evt">
+                        if (!myTree.selectedItems[0]) return;
+
+                        var url = "/resources/"+myTree.selectedItems[0].id+
+                            "?includeChildPages="+includeChildPages.get("value")+(urlToSearch.value==""?"":"&includedUrlString="+escape(urlToSearch.value))+"&export=true";
+
+                        if (dojo.isOpera) {
+                            dojo.io.iframe.send({
+                                url:url,
+                                timeout:4000
+                            });
+                        }
+                        else {
+                            dojo.create("iframe", {src: url , style: "display: none"}, dojo.doc.body);
+                        }
+                    </script>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region: 'bottom'"
+         id="bottom" class="edgePanel">
+        技术支持：北京银河万佳电子技术有限公司
+    </div>
+</div>
+
+<% include footer.html %>

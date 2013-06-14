@@ -1,0 +1,270 @@
+﻿* {
+    outline: none !important;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    background-image: url("../images/background.jpg");
+    background-repeat: repeat-x;
+    height: 100%;
+    margin: 0;
+    overflow: scroll;
+    padding: 0;
+}
+
+#appLayout {
+    background-color: #00378A;
+    width: 1033px;
+    height: 100%;
+    min-height: 700px;
+    margin: 0 auto 0 auto;
+}
+
+#banner {
+    background-image: url("../images/banner.jpg");
+    background-repeat: no-repeat;
+    margin-left: -5px;
+    margin-right: -5px;
+    margin-top: -5px;
+    padding: 0;
+    height: 81px;
+    border: 0;
+}
+
+#navigation {
+    background-color: #005FB3;
+    width: 213px;
+    margin-left: -5px;
+    margin-right: -5px;
+    margin-top: -5px;
+    padding: 8px;
+}
+
+#pageTree {
+    background-color: #E7F8FF;
+    border: 0;
+}
+
+#treeBackground {
+    background-color: #005FB3;
+    background-image: url("../images/tree_background.png");
+    background-attachment:fixed;
+    background-position: -23px 45px;
+    height: 120px;
+    margin-left: -5px;
+    margin-right: -5px;
+    border: 0;
+    padding: 0;
+}
+
+#findSite {
+    height: 50px;
+    background-image: url("../images/find_top.jpg");
+    padding-top: 20px;
+    margin-left: -8px;
+    margin-top: -8px;
+}
+
+#findLeft {
+    background-color: #005FB3;
+    background-image: url("../images/find_left.png");
+    margin-left: 7px;
+    margin-top: 0px;
+    border: 0;
+}
+
+#siteToFind {
+    overflow: hidden;
+    background-color: #005FB3;
+    background-image: url("../images/find_background.png");
+    background-repeat: repeat-x;
+    margin: 0 0 0 -1px;
+    padding: 0;
+    border: 0;
+}
+
+#findLeft_splitter,#siteFind_splitter{
+    display: none;
+}
+
+#siteFind {
+    width: 33px;
+    height: 27px;
+    background-color: #005FB3;
+    background-image: url("../images/find_right.png");
+    background-repeat: no-repeat;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    overflow: hidden;
+}
+
+#siteFind .dijitButtonNode {
+    border: 0;
+    background-image: none;
+    background: transparent;
+}
+
+.findIcon {
+    background-image: url('../images/find.png');
+    background-repeat: no-repeat;
+    width: 18px;
+    height: 17px;
+    text-align: center;
+}
+
+#navigation_splitter {
+    background-color: #00378A;
+}
+
+.dijitTreeContent img {
+    width: 8px;
+    background-image: url("../images/tree-dash.png");
+    background-repeat: repeat-x;
+    background-position: 0 6px;
+    margin-left: -4px;
+}
+
+.dijitTreeLabel {
+    color: #005FB3;
+}
+
+#pageUrl, #urlToSearch, #urlSearch, #includeChildPages, #exportUrls {
+    height: 24px;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    overflow: hidden;
+}
+
+#searchForUrl {
+    height: 45px;
+    padding-top: 8px;
+}
+
+#pageUrl {
+    background: transparent;
+    color: white;
+    margin-top: 4px;
+    margin-left: 8px;
+}
+
+#searchUrl {
+    width: 300px;
+}
+
+#searchLeft {
+    background: transparent;
+    background-image: url("../images/search_left.png");
+    background-repeat: no-repeat;
+    background-position: 7px 0;
+    margin-top: 0;
+    border: 0;
+}
+
+#urlToSearch {
+    height: 28px;
+    background: transparent;
+    background-image: url("../images/search_background.png");
+    background-repeat: repeat-x;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    overflow: hidden;
+}
+
+#txtUrlToSearch{
+    height: 14px;
+    background-color: white;
+    margin-left: 0;
+    margin-top: 6px;
+}
+
+#searchLeft_splitter,#urlSearch_splitter{
+    display: none;
+}
+
+#urlSearch {
+    width: 48px;
+    height: 27px;
+    background: transparent;
+    background-image: url("../images/search_right.png");
+    background-repeat: no-repeat;
+    padding: 0;
+    margin: 0 16px 0 0;
+    border: 0;
+    overflow: hidden;
+}
+
+#urlSearch .dijitButtonNode {
+    border: 0;
+    background-image: none;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+}
+
+#doUrlSearch {
+    margin: 8px 0 0 8px;
+    border: 0;
+}
+
+#urlTableContainer, #urlActions {
+    background-color: #E7F8FF;
+    border: 0;
+}
+
+#urlTable.dojoxGridCell {
+    border-color: #C4C4C4;
+}
+
+#urlActions_splitter {
+    display: none;
+}
+
+#urlActions {
+    background-color: #E7F8FF;
+    height: 50px;
+    padding: 0;
+    padding: 0 0 0 8px;
+}
+
+#includeChildPages, #exportUrls {
+    background: transparent;
+}
+
+#includeChildPages label {
+    color: #0076C9;
+    font-weight: 800;
+}
+
+#exportUrls .dijitButtonNode {
+    border: 0;
+    background-image: none;
+    background: transparent;
+    box-shadow: 0 0 0 0;
+}
+
+.exportIcon {
+    background-image: url('../images/export.png');
+    background-repeat: no-repeat;
+    width: 81px;
+    height: 25px;
+    text-align: center;
+}
+
+#bottom {
+    background-image: url("../images/bottom.jpg");
+    background-repeat: no-repeat;
+    text-align: center;
+    height: 30px;
+    margin-top: 0;
+    padding: 0;
+    border: 0;
+}
+
+#viewsChart {
+    width: 550px;
+    height: 550px;
+}

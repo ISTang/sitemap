@@ -1,3 +1,4 @@
 fifo*
 *.o
-
+logs
+.idea
