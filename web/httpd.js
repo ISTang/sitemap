@@ -103,15 +103,15 @@ void main(function () {
     });
 
     webapp.get('/pages/:id', function (req, res) {
-        var id = req.params.id;
-        if (id=="root") {
+        var pageUrl = querystring.unescape(req.params.id);
+        if (pageUrl=="root") {
             db.getAllSites(function (err, root) {
                 res.setHeader("Content-Type", "application/json;charset=utf-8");
                 if (err) res.json({id:"root",name:"根", children:[{id:"1",name:err}]});
                 else res.json(root);
             });
         } else {
-            db.getPages(id, function (err, pages) {
+            db.getPages(pageUrl, function (err, pages) {
                 res.setHeader("Content-Type", "application/json;charset=utf-8");
                 if (err) res.json({children:[]});
                 else res.json({children:pages});

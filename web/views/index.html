@@ -46,7 +46,7 @@
             <div data-dojo-type="dojo/store/JsonRest" data-dojo-id="pagesStore"
                  data-dojo-props="target: '/pages/'">
                 <script type="dojo/method" data-dojo-event="getChildren" data-dojo-args="object">
-                    return this.get(object.id).then(function(fullObject){
+                    return this.get(escape(object.id)).then(function(fullObject){
                         return fullObject.children;
                     });
                 </script>

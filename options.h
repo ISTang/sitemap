@@ -46,7 +46,7 @@
 #define URL_TAGS
 
 // do you want to suppress duplicate pages
-//#define NO_DUP
+#define NO_DUP
 
 // do you want sitemap to stop when everything has been fetched
 //#define EXIT_AT_END
@@ -88,7 +88,7 @@
 // if this option is set, sitemap saves the hashtable from time to time
 // this way it can restart from where it last stopped
 // by reloading the table
-#define RELOAD
+//#define RELOAD
 
 
 //////////////////////////////////////////////////////////
@@ -113,11 +113,18 @@
 
 // Please enable this option if you want to report a crash
 // then compile with "make debug"
-//#define CRASH
+#define CRASH
 
+//#define URLREVERSE
+
+//#define SAVEPAGE
+
+#define OUTLINKS
+
+//#define SAVEFAILED
 
 // page depth for out
 // 0 for root
-#define OUTDEPTH 3
+#define OUTDEPTH 5
 
 #endif // SITEMAP_CONFIG

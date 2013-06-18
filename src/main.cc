@@ -85,14 +85,16 @@ void sig_term(int signo) {
 ///////////////////////////////////////////////////////////
 // If this thread terminates, the whole program exits
 int main (int argc, char *argv[]) {
-  printf("Sitemap forking self...\r\n");
+/*  printf("Sitemap forking self...\r\n");
   if(daemon_init() == -1) {
     printf("Sitemap can't fork self!\r\n");
     exit(0);
   }
   openlog("sitemap", LOG_PID, LOG_USER);
   syslog(LOG_INFO, "Sitemap started.");
-  signal(SIGTERM, sig_term); /* arrange to catch the signal */
+  signal(SIGTERM, sig_term); // arrange to catch the signal
+*/
+  //printf("Sitemap 正在运行...\n");
 
   // create all the structures
   global glob(argc, argv);
@@ -192,7 +194,7 @@ static void cron () {
 #endif // NDEBUG
 
 #ifdef STATS
-    printf("\n%surls : %d  (rate : %d)\npages : %d  (rate : %d)\nsuccess : %d  (rate : %d)\n",
+    printf("\n%sURL : %d  (比率 : %d)\n页面 : %d  (比率 : %d)\n成功 : %d  (比率 : %d)\n",
            ctime(&global::now), urls, urlsRate, pages, pagesRate,
            answers[success], successRate);
 #endif // STATS

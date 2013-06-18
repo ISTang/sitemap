@@ -45,7 +45,7 @@ void loaded (html *page) {
   // them if you want to keep them
   // in order to accept \000 in the page, you can use page->getLength()
 #ifdef BIGSTATS
-  std::cout << "Fetched : ";
+  std::cout << "已获取到 : ";
   page->getUrl()->print();
   std::cout << page->getHeaders() << "\n" << page->getPage() << "\n";
 #endif // BIGSTATS
@@ -53,19 +53,22 @@ void loaded (html *page) {
   char *pageUrl = page->getUrl()->giveUrl();
 
   // skip duplicate page
-#ifndef NDEBUG
-  std::cout<<"Checking page url: "<<pageUrl<<std::endl;
-#endif
+//#ifndef NDEBUG
+//  std::cout<<"检查页面 "<<pageUrl<<"..."<<std::endl;
+//#endif
   bool pageExists = (cc.count("sitemap.page", BSON("url"<<pageUrl)) > 0);
 
   if (pageExists) {
-#ifndef NDEBUG
-    std::cerr<<"Page url "<<pageUrl<<" exists"<<std::endl;
-#endif
+//#ifndef NDEBUG
+//    std::cerr<<"页面 "<<pageUrl<<" 已经存在"<<std::endl;
+//#endif
     return;
   }
 
   // detect page encoding
+//#ifndef NDEBUG
+//      std::cout<<"检测页面 "<<pageUrl<<" 编码..."<<std::endl;
+//#endif // NDEBUG
   char pageEncoding[MAX_ENCODING+1];
   memset(pageEncoding, 0, sizeof pageEncoding);
   char *pContentTypeBegin = strcasestr(page->getPage(), "<meta http-equiv=\"Content-Type\" content=\"");
@@ -87,9 +90,9 @@ void loaded (html *page) {
         }
       }
       delete[] contentType;
-#ifndef NDEBUG
-      std::cout<<"Page encoding of url "<<pageUrl<<": "<<pageEncoding<<std::endl;
-#endif // NDEBUG
+//#ifndef NDEBUG
+//      std::cout<<"页面 "<<pageUrl<<" 编码: "<<pageEncoding<<std::endl;
+//#endif // NDEBUG
     }
   } else {
     char *pCharsetBegin = strcasestr(page->getPage(), "<meta charset=\"");
@@ -103,9 +106,9 @@ void loaded (html *page) {
   }
 
   // page title
-#ifndef NDEBUG
-  std::cout<<"Getting page title for url: "<<pageUrl<<std::endl;
-#endif
+//#ifndef NDEBUG
+//  std::cout<<"获取页面 "<<pageUrl<<" 标题..."<<std::endl;
+//#endif
   char *pageTitle = NULL;
   char *p = strcasestr(page->getPage(), "<title>");
   if (p) {
@@ -120,7 +123,7 @@ void loaded (html *page) {
     if (*pageEncoding!='\0' && strcasecmp(pageEncoding, "utf-8")) {
       iconv_t hIconv = iconv_open("UTF-8", pageEncoding);
       if (-1 == (long)hIconv ) {
-        std::cerr<<"Cannot convert page title from "<<pageEncoding<<" to UTF-8 for url "<<pageUrl<<std::endl;
+        std::cerr<<"无法将页面 "<<pageUrl<<" 的标题从编码 "<<pageEncoding<<" 转换成编码 UTF-8"<<std::endl;
         //exit(3);
       } else {
         char inBuf[MAX_TITLE+1];
@@ -141,10 +144,12 @@ void loaded (html *page) {
         iconv_close( hIconv );
       }
     }
+  } else {
+    std::cout<<"页面 "<<pageUrl<<" 无标题"<<std::endl;
   }
 
 #ifndef NDEBUG
-  std::cout<<"Saving page info for url "<<pageUrl<<"..."<<std::endl;
+  std::cout<<"保存页面 "<<pageUrl<<"..."<<std::endl;
 #endif
   mongo::BSONObjBuilder b;
   b.append("url", pageUrl);
@@ -184,7 +189,7 @@ void loaded (html *page) {
 void failure (url *u, FetchError reason) {
   // Here should be the code for managing everything
 #ifdef BIGSTATS
-  std::cout << "fetched failed (" << (int)reason << ") : ";
+  std::cout << "获取失败 (" << (int)reason << ") : ";
   u->print();
 #endif // BIGSTATS
 
@@ -199,31 +204,46 @@ void failure (url *u, FetchError reason) {
  */
 void initUserOutput () {
 
+  std::cout << "连接数据库 " << "..." << std::endl;
   try {
     cc.connect("127.0.0.1");
     //std::cout << "Mogodb connected ok" << std::endl;
   } catch( const mongo::DBException &e ) {
-    std::cout << "连接 mongo 数据库失败: " << e.what() << std::endl;
+    std::cout << "连接数据库失败: " << e.what() << std::endl;
     exit(2);
     return;
   }
+
+  std::cout << "清理数据..." << std::endl;
+  cc.remove("sitemap.failed", mongo::BSONObj(), false);
+  cc.remove("sitemap.page", mongo::BSONObj(), false);
+  cc.remove("sitemap.site", mongo::BSONObj(), false);
+
+  std::cout << "等待提供要爬的站点..." << std::endl;
 }
 
-static void outputPage(mongo::DBClientConnection &cc, int fds, int pageIndex, char *pageUrl, int indent, std::vector<const char*>& pageUrlStack, bool site, bool handleChildPages) {
+static void outputPage(mongo::DBClientConnection &cc, int fds, char *pageUrl, int indent, bool site, int siteIndex) {
 
-#ifndef NDEBUG
-  std::cout<<"Page #"<<pageIndex<<": "<<pageUrl<<std::endl;
-#endif
+  std::auto_ptr<mongo::DBClientCursor> cursor = cc.query("sitemap.page", QUERY("url"<<pageUrl));
+  if (!cursor->more()) {
+
+    ecrire(fds, "页面 ");
+    ecrire(fds, "<a target=\"_blank\" href=\"");
+    ecrire(fds, (char *)pageUrl);
+    ecrire(fds, "\">");
+    ecrire(fds, (char *)pageUrl);
+    ecrire(fds, "</a>&nbsp;&nbsp;尚未爬出！");
+    return;
+  }
+  mongo::BSONObj obj = cursor->next();
+
   ecrire(fds, "<p>");
   for (int i=0; i<indent*2; i++) ecrire(fds, "&nbsp;");
   ecrire(fds, (char *)(site?"站点":"页面"));
-  if (pageIndex) ecrireInt(fds, pageIndex);
+  if (site) {
+    ecrireInt(fds, siteIndex);
+  }
   ecrire(fds, ": ");
-
-  std::auto_ptr<mongo::DBClientCursor> cursor = cc.query("sitemap.page", QUERY("url"<<pageUrl));
-  if (!cursor->more()) return;
-
-  mongo::BSONObj obj = cursor->next();
 
   const char *title = obj.getStringField("title");
   int tag = (site?obj.getIntField("tag"):-1);
@@ -244,14 +264,14 @@ static void outputPage(mongo::DBClientConnection &cc, int fds, int pageIndex, ch
 
     ecrire(fds, "&nbsp;&nbsp;");
     ecrire(fds, "<a target=\"_blank\" href=\"/output.html?");
-    ecrire(fds, pageUrl);
+    ecrire(fds, (char *)pageUrl);
     ecrire(fds, "\">");
     ecrire(fds, "详细");
     ecrire(fds, "</a>");
   }
   ecrire(fds, "</p>");
 
-  if (!handleChildPages || indent+1>OUTDEPTH)  return;
+  if (site) return;
 
   mongo::BSONElement linksElement = obj.getField("links");
   if (!linksElement.eoo() && linksElement.type()==mongo::Array) {
@@ -265,42 +285,30 @@ static void outputPage(mongo::DBClientConnection &cc, int fds, int pageIndex, ch
       const char *type = (*it)["type"].str().c_str();
 
       ecrire(fds, "<br>");
+
       for (int i=0; i<indent*2; i++) ecrire(fds, "&nbsp;");
+
       ecrire(fds, "#");
       ecrireInt(fds, linkIndex++);
       ecrire(fds, ": [");
       ecrire(fds, (char *)type);
-      ecrire(fds, "] <a href=\"");
+      ecrire(fds, "] <a target=\"_blank\" href=\"");
       ecrire(fds, (char *)linkUrl);
       ecrire(fds, "\">");
       ecrire(fds, (char*)linkUrl);
       ecrire(fds, "</a>");
-      ecrire(fds, "</br>");
 
       if (!strcmp(type, "anchor")||!strcmp(type, "iframe")||!strcmp(type, "frame")) {
 
-        pageUrls.push_back(linkUrl);
+        ecrire(fds, "&nbsp;&nbsp;");
+        ecrire(fds, "<a target=\"_blank\" href=\"/output.html?");
+        ecrire(fds, (char *)linkUrl);
+        ecrire(fds, "\">");
+        ecrire(fds, "详细");
+        ecrire(fds, "</a>");
       }
 
-      int pageIndex = 1;
-      for (unsigned i=0; i<pageUrls.size(); i++) {
-
-        bool rescure = false;
-        std::vector<const char*>::const_iterator it=pageUrlStack.begin();
-        for (; it!=pageUrlStack.end(); it++) {
-
-          if (!strcmp(*it, pageUrls[i].c_str())) {
-            rescure = true;
-            break;
-          }
-        }
-        if (rescure) {
-
-          pageUrlStack.push_back(pageUrl);
-          outputPage(cc, fds, pageIndex++, (char*)pageUrls[i].c_str(), indent, pageUrlStack, false, true);
-          pageUrlStack.pop_back();
-        }
-      }
+      ecrire(fds, "</br>");
     }
   }
 }
@@ -317,25 +325,16 @@ void outputStats(int fds, const char *queryParams) {
   try {
     cc.connect("127.0.0.1");
   } catch( const mongo::DBException &e ) {
-#ifndef NDEBUG
-    std::cout << "连接 mongo 数据库失败: " << e.what() << std::endl;
-#endif
     ecrire(fds, "</pre>");
     ecrire(fds, "无法连接数据库！");
     ecrire(fds, "<pre>");
     return;
   }
 
-  std::vector<const char *> pageUrlStack;
-
   if (queryParams) {
-#ifndef NDEBUG
-    std::cout<<"outputStats: "<<queryParams<<std::endl;
-#endif
+
     ecrire(fds, "</pre>");
-
-    outputPage(cc, fds, 0, (char *)queryParams, 0, pageUrlStack, true, true);
-
+    outputPage(cc, fds, (char *)queryParams, 0, false, 0);
     ecrire(fds, "<pre>");
 
     return;
@@ -343,23 +342,18 @@ void outputStats(int fds, const char *queryParams) {
 
   ecrire(fds, "</pre>");
 
-#ifndef NDEBUG
-  std::cout<<"Getting site count..."<<std::endl;
-#endif
   int siteCount = cc.count("sitemap.site");
-#ifndef NDEBUG
-  std::cout<<"Total "<<siteCount<<" sites..."<<std::endl;
-#endif
   ecrire(fds, "<p>总共 <strong>");
   ecrireInt(fds, siteCount);
   ecrire(fds, "</strong> 个站点。</p>");
 
   std::auto_ptr<mongo::DBClientCursor> cursor = cc.query("sitemap.site");
-  int i=0;
+  int i = 0;
   while (cursor->more()) {
+
     mongo::BSONObj obj = cursor->next();
     char *pageUrl = (char *)obj.getStringField("url");
-    outputPage(cc, fds, i+1, pageUrl, 0, pageUrlStack, true, false);
+    outputPage(cc, fds, pageUrl, 0, true, i+1);
 
     i++;
   }

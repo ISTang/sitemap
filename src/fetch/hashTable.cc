@@ -29,7 +29,7 @@ hashTable::hashTable (bool create) {
   } else {
 	int fds = open("hashtable.bak", O_RDONLY);
 	if (fds < 0) {
-	  std::cerr << "Cannot find hashtable.bak, restart from scratch\n";
+	  std::cerr << "找不到 hashtable.bak, 从头开始\n";
       for (ssize_t i=0; i<hashSize/8; i++) {
         table[i] = 0;
       }
@@ -38,7 +38,7 @@ hashTable::hashTable (bool create) {
       while (sr < total) {
         ssize_t tmp = read(fds, table+sr, total-sr);
         if (tmp <= 0) {
-          std::cerr << "Cannot read hashtable.bak : "
+          std::cerr << "无法读取 hashtable.bak : "
                << strerror(errno) << std::endl;
           exit(1);
         } else {

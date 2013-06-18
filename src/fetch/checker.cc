@@ -9,6 +9,7 @@
 
 #include <iostream>
 #include <string.h>
+#include <stdlib.h>
 
 #include "options.h"
 
@@ -24,9 +25,10 @@
 
 /** check if an url is allready known
  * if not send it
+ * @param here the url of page
  * @param u the url to check
  */
-void check (url *u) {
+void check (url *here, url *u) {
   if (global::seen->testSet(u)) {
 	hashUrls();  // stat
 	// where should this link go ?
@@ -39,12 +41,27 @@ void check (url *u) {
 	  global::URLsDisk->put(u);
 	}
 #else // not a SPECIFICSEARCH
-    global::URLsDisk->put(u);
+    bool save = true;
+    char *hereHost = here->getHost();
+    char *targetHost = u->getHost();
+    char *pHereDomainName = strchr(hereHost, '.');
+    char *pTargetDomainName = strchr(targetHost, '.');
+    if (pHereDomainName && pTargetDomainName) {
+      pHereDomainName++;
+      pTargetDomainName++;
+      int minLen = std::min(strlen(pHereDomainName), strlen(pTargetDomainName));
+      if (strncmp(pHereDomainName, pTargetDomainName, minLen)) {
+        save = false;
+      }
+    }
+    if (save) {
+      global::URLsDisk->put(u);
+    }
 #endif
   } else {
 	// This url has already been seen
     answers(urlDup);
-	delete u;
+    delete u;
   }
 }
 

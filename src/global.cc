@@ -1,4 +1,4 @@
-// Larbin
+// Sitemap
 // Sebastien Ailleret
 // 29-11-99 -> 09-03-02
 
@@ -81,7 +81,7 @@ long int global::remainBand = MAXBANDWIDTH;
 int global::IPUrl = 0;
 
 /** Constructor : initialize almost everything
- * Everything is read from the config file (larbin.conf by default)
+ * Everything is read from the config file (sitemap.conf by default)
  */
 global::global (int argc, char *argv[]) {
   char *configFile = "sitemap.conf";
@@ -105,7 +105,7 @@ global::global (int argc, char *argv[]) {
 	}
   }
   if (pos != argc) {
-	std::cerr << "usage : " << argv[0];
+	std::cerr << "用法 : " << argv[0];
 	std::cerr << " [-c configFile] [-scratch]\n";
 	exit(1);
   }
@@ -136,10 +136,10 @@ global::global (int argc, char *argv[]) {
   hDuplicate = new hashDup(dupSize, dupFile, !reload);
 #endif // NO_DUP
   // Read the configuration file
-  crash("Read the configuration file");
+  //crash("读取配置文件");
   parseFile(configFile);
   // Initialize everything
-  crash("Create global values");
+  //crash("创建全局值");
   // Headers
   LarbinString strtmp;
   strtmp.addString("\r\nUser-Agent: ");
@@ -196,7 +196,7 @@ global::global (int argc, char *argv[]) {
   sn.sa_flags = SA_RESTART;
   sn.sa_handler = SIG_IGN;
   if (sigaction(SIGPIPE, &sn, &so)) {
-    std::cerr << "Unable to disable SIGPIPE : " << strerror(errno) << std::endl;
+    std::cerr << "无法禁用 SIGPIPE : " << strerror(errno) << std::endl;
   }
 }
 
@@ -210,7 +210,7 @@ global::~global () {
 void global::parseFile (char *file) {
   int fds = open(file, O_RDONLY);
   if (fds < 0) {
-	std::cerr << "cannot open config file (" << file << ") : "
+	std::cerr << "无法打开配置文件 (" << file << ") : "
          << strerror(errno) << std::endl;
 	exit(1);
   }
@@ -236,9 +236,9 @@ void global::parseFile (char *file) {
 	  tok = nextToken(&posParse);
       url *u = new url(tok, global::depthInSite, (url *) NULL);
       if (u->isValid()) {
-        check(u);
+        check(NULL, u);
       } else {
-        std::cerr << "the start url " << tok << " is invalid\n";
+        std::cerr << "起始 url " << tok << " 无效\n";
         exit(1);
       }
 	} else if (!strcasecmp(tok, "waitduration")) {
@@ -252,7 +252,7 @@ void global::parseFile (char *file) {
 	  memset((char *) proxyAddr, 0, sizeof (struct sockaddr_in));
 	  if ((hp = gethostbyname(tok)) == NULL) {
 		endhostent();
-		std::cerr << "Unable to find proxy ip address (" << tok << ")\n";
+		std::cerr << "找不到代理 IP 地址 (" << tok << ")\n";
 		exit(1);
 	  } else {
 		proxyAddr->sin_family = hp->h_addrtype;
@@ -284,7 +284,7 @@ void global::parseFile (char *file) {
 	} else if (!strcasecmp(tok, "noExternalLinks")) {
 	  externalLinks = false;
 	} else {
-	  std::cerr << "bad configuration file : " << tok << "\n";
+	  std::cerr << "配置文件无效 : " << tok << "\n";
 	  exit(1);
 	}
 	tok = nextToken(&posParse);
@@ -303,7 +303,7 @@ void global::manageDomain (char **posParse) {
 	tok = nextToken(posParse);
   }
   if (tok == NULL) {
-	std::cerr << "Bad configuration file : no end to limitToDomain\n";
+	std::cerr << "配置文件无效 : limitToDomain 无结束标志\n";
 	exit(1);
   }
 }
@@ -322,7 +322,7 @@ void global::manageExt (char **posParse) {
 	tok = nextToken(posParse);
   }
   if (tok == NULL) {
-	std::cerr << "Bad configuration file : no end to forbiddenExtensions\n";
+	std::cerr << "配置文件无效 : forbiddenExtensions 无结束标志\n";
 	exit(1);
   }
 }

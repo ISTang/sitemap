@@ -10,9 +10,10 @@
 
 /** check if an url is allready known
  * if not send it
+ * @param here the url of page
  * @param u the url to check
  */
-void check (url *u);
+void check (url *here, url *u);
 
 /** Check the extension of an url
  * @return true if it might be interesting, false otherwise

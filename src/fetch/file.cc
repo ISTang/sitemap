@@ -298,12 +298,16 @@ void html::manageUrl (url *nouv, TagType tagType, bool isRedir) {
 #ifdef LINKS_INFO
     links.addElement(new LinkInfo(nouv->giveUrl(), tagType));
 #endif // LINKS_INFO
-    if (nouv->initOK(here)) {
-      check(nouv);
-    } else {
-      // this url is forbidden for errno reason (set by initOK)
-      answers(errno);
+    if (tagType==ttImage || tagType ==ttLink || tagType==ttScript) {
       delete nouv;
+    } else {
+      if (nouv->initOK(here)) {
+        check(here, nouv);
+      } else {
+        // this url is forbidden for errno reason (set by initOK)
+        answers(errno);
+        delete nouv;
+      }
     }
   } else {
     // The extension is stupid
@@ -667,7 +671,7 @@ void html::parseContent (int action, TagType tagType) {
     case BASE:
       // This page has a BASE HREF tag
       {
-        uint end = posParse - area - 1;
+        /*uint end = posParse - area - 1;
         while (end > 7 && area[end] != '/') end--; // 7 because http://
         if (end > 7) { // this base looks good
           end++;
@@ -682,7 +686,7 @@ void html::parseContent (int action, TagType tagType) {
             delete tmpbase;
             base = NULL;
           }
-        }
+        }*/
       }
       break;
     default: assert(false);
