@@ -20,9 +20,13 @@ ABS-FETCH-OBJ:=fetch/site.o fetch/sequencer.o fetch/hashTable.o \
 ABS-MAIN-OBJ:=$(MAIN-OBJ)
 
 CFLAGS:=-O3 -Wall -D_REENTRANT
-CXXFLAGS:= -Wno-deprecated -Wall -O3 -D_REENTRANT -I- -I$(BASEDIR) -I$(ADNSDIR) \
+CXXFLAGS:= -Wno-deprecated -Wall -O3 -D_REENTRANT -I$(BASEDIR) -I$(ADNSDIR) \
     -I/usr/local/include/boost/thread/detail \
-    -I/usr/local/include/mongo/base -I/usr/local/include/mongo/util -I/usr/local/include/mongo/util/concurrency \
+    -I/usr/local/include/mongo \
+    -I/usr/local/include/mongo/base \
+    -I/usr/local/include/mongo/client \
+    -I/usr/local/include/mongo/util \
+    -I/usr/local/include/mongo/util/concurrency \
     -I/usr/local/include/mongo/util/net
 RM:=rm -f
 

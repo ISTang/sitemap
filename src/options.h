@@ -83,12 +83,12 @@
 // do we need a special thread for output
 // This is compulsory if it can block
 // (not needed if you did not add code yourself)
-//#define THREAD_OUTPUT
+#define THREAD_OUTPUT
 
 // if this option is set, sitemap saves the hashtable from time to time
 // this way it can restart from where it last stopped
 // by reloading the table
-//#define RELOAD
+#define RELOAD
 
 
 //////////////////////////////////////////////////////////

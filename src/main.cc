@@ -10,6 +10,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <syslog.h>
+#include <signal.h>
 
 #include "options.h"
 
@@ -57,9 +59,41 @@ static void waitBandwidth (time_t *old) {
 static uint count = 0;
 #endif // NDEBUG
 
+int daemon_init(void) {
+  pid_t pid;
+  if((pid = fork()) < 0) return(-1);
+  else if(pid != 0) exit(0); /* parent exit */
+
+  /* child continues */
+  setsid(); /* become session leader */
+  chdir("/"); /* change working directory */
+  umask(0); /* clear file mode creation mask */
+  close(0); /* close stdin */
+  close(1); /* close stdout */
+  close(2); /* close stderr */
+  return(0);
+}
+
+void sig_term(int signo) {
+  if(signo == SIGTERM) {
+    /* catched signal sent by kill(1) command */
+    syslog(LOG_INFO, "program terminated.");
+    closelog(); exit(0);
+  }
+}
+
 ///////////////////////////////////////////////////////////
 // If this thread terminates, the whole program exits
 int main (int argc, char *argv[]) {
+  printf("Sitemap forking self...\r\n");
+  if(daemon_init() == -1) {
+    printf("Sitemap can't fork self!\r\n");
+    exit(0);
+  }
+  openlog("sitemap", LOG_PID, LOG_USER);
+  syslog(LOG_INFO, "Sitemap started.");
+  signal(SIGTERM, sig_term); /* arrange to catch the signal */
+
   // create all the structures
   global glob(argc, argv);
 #ifdef PROF
@@ -73,7 +107,6 @@ int main (int argc, char *argv[]) {
 #endif // NOWEBSERVER
 
   // Start the search
-  printf("%s 已经启动\n", global::userAgent);
   time_t old = global::now;
 
   for (;;) {

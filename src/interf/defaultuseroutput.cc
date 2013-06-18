@@ -83,7 +83,7 @@ void loaded (html *page) {
         char *pCharsetEnd = strchr(pCharsetBegin, ';');
         if (!pCharsetEnd) pCharsetEnd = pCharsetBegin+strlen(contentType);
         if (strncmp(pCharsetBegin, "text/html", 9)) {
-          strncpy(pageEncoding, pCharsetBegin, std::min(MAX_ENCODING, pCharsetEnd-pCharsetBegin));
+          strncpy(pageEncoding, pCharsetBegin, std::min(MAX_ENCODING, int(pCharsetEnd-pCharsetBegin)));
         }
       }
       delete[] contentType;
@@ -97,7 +97,7 @@ void loaded (html *page) {
       pCharsetBegin += 15;
       char *pCharsetEnd = strchr(pCharsetBegin, '\"');
       if (pCharsetEnd) {
-        strncpy(pageEncoding, pCharsetBegin, std::min(MAX_ENCODING, pCharsetEnd-pCharsetBegin));
+        strncpy(pageEncoding, pCharsetBegin, std::min(MAX_ENCODING, int(pCharsetEnd-pCharsetBegin)));
       }
     }
   }
@@ -119,7 +119,7 @@ void loaded (html *page) {
   if (pageTitle) {
     if (*pageEncoding!='\0' && strcasecmp(pageEncoding, "utf-8")) {
       iconv_t hIconv = iconv_open("UTF-8", pageEncoding);
-      if (-1 == (int)hIconv ) {
+      if (-1 == (long)hIconv ) {
         std::cerr<<"Cannot convert page title from "<<pageEncoding<<" to UTF-8 for url "<<pageUrl<<std::endl;
         //exit(3);
       } else {
