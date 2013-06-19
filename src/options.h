@@ -88,7 +88,7 @@
 // if this option is set, sitemap saves the hashtable from time to time
 // this way it can restart from where it last stopped
 // by reloading the table
-//#define RELOAD
+#define RELOAD
 
 
 //////////////////////////////////////////////////////////
@@ -102,7 +102,7 @@
 #define GRAPH
 
 // uncomment if you are not interested in debugging information
-//#define NDEBUG
+#define NDEBUG
 
 // enable this if you really dislike stats (in the webserver)
 //#define NOSTATS

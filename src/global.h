@@ -57,6 +57,9 @@ struct global {
   global (int argc, char * argv[]);
   /** Destructor : never used */
   ~global ();
+
+  static bool daemonize;
+
   /** current time : avoid to many calls to time(NULL) */
   static time_t now;
   /** List of pages allready seen (one bit per page) */

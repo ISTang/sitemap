@@ -1,6 +1,4 @@
-// Larbin
-// Sebastien Ailleret
-// 09-11-99 -> 09-03-02
+//  Sitemap
 
 #include <unistd.h>
 #include <signal.h>
@@ -12,6 +10,7 @@
 #include <fcntl.h>
 #include <syslog.h>
 #include <signal.h>
+#include <iostream>
 
 #include "options.h"
 
@@ -59,45 +58,18 @@ static void waitBandwidth (time_t *old) {
 static uint count = 0;
 #endif // NDEBUG
 
-int daemon_init(void) {
-  pid_t pid;
-  if((pid = fork()) < 0) return(-1);
-  else if(pid != 0) exit(0); /* parent exit */
-
-  /* child continues */
-  setsid(); /* become session leader */
-  chdir("/"); /* change working directory */
-  umask(0); /* clear file mode creation mask */
-  close(0); /* close stdin */
-  close(1); /* close stdout */
-  close(2); /* close stderr */
-  return(0);
-}
-
-void sig_term(int signo) {
-  if(signo == SIGTERM) {
-    /* catched signal sent by kill(1) command */
-    syslog(LOG_INFO, "program terminated.");
-    closelog(); exit(0);
-  }
-}
+void daemonize();
 
 ///////////////////////////////////////////////////////////
 // If this thread terminates, the whole program exits
 int main (int argc, char *argv[]) {
-/*  printf("Sitemap forking self...\r\n");
-  if(daemon_init() == -1) {
-    printf("Sitemap can't fork self!\r\n");
-    exit(0);
-  }
-  openlog("sitemap", LOG_PID, LOG_USER);
-  syslog(LOG_INFO, "Sitemap started.");
-  signal(SIGTERM, sig_term); // arrange to catch the signal
-*/
-  //printf("Sitemap 正在运行...\n");
 
-  // create all the structures
   global glob(argc, argv);
+
+  if (global::daemonize) daemonize();
+
+  printf("Sitemap已经启动。");
+
 #ifdef PROF
   signal (2, handler);
 #endif // PROF
@@ -201,3 +173,38 @@ static void cron () {
   }
 #endif // NOSTATS
 }
+
+void daemonize()
+{
+	int childpid, fd, fdtablesize;
+
+	/* ignore terminal I/O, stop signals */
+	signal(SIGTTOU,SIG_IGN);
+	signal(SIGTTIN,SIG_IGN);
+	signal(SIGTSTP,SIG_IGN);
+
+	/* fork to put us in the background (whether or not the user specified '&' on the command line */
+	if ((childpid = fork()) < 0) {
+		std::cerr<<"Failed to fork first children."<<std::endl;
+		exit(1);
+	} else if (childpid > 0)
+		exit(0); /* terminate parent, continue in child */
+
+	/* dissociate from process group */
+	if (setsid()<0) {
+		std::cerr<<"Failed to become process group leader."<<std::endl;
+		exit(1);
+	}
+
+	/* close any open file descriptors */
+	fdtablesize = getdtablesize();
+	for (fd = 0; fd < fdtablesize; fd++)
+		close(fd);
+
+	/* set working directory to allow filesystems to be unmounted */
+	//chdir("/");
+
+	/* clear the inherited umask */
+	umask(0);
+}
+

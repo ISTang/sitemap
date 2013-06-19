@@ -4,8 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <vector>
+#include <set>
 #include <iconv.h>
-
 #include <cstdlib>
 #include <mongo/client/dbclient.h>
 
@@ -123,7 +123,9 @@ void loaded (html *page) {
     if (*pageEncoding!='\0' && strcasecmp(pageEncoding, "utf-8")) {
       iconv_t hIconv = iconv_open("UTF-8", pageEncoding);
       if (-1 == (long)hIconv ) {
+#ifndef NDEBUG
         std::cerr<<"无法将页面 "<<pageUrl<<" 的标题从编码 "<<pageEncoding<<" 转换成编码 UTF-8"<<std::endl;
+#endif
         //exit(3);
       } else {
         char inBuf[MAX_TITLE+1];
@@ -145,7 +147,9 @@ void loaded (html *page) {
       }
     }
   } else {
+#ifndef NDEBUG
     std::cout<<"页面 "<<pageUrl<<" 无标题"<<std::endl;
+#endif
   }
 
 #ifndef NDEBUG
@@ -157,14 +161,16 @@ void loaded (html *page) {
 
   mongo::BSONArrayBuilder b2;
   Vector<LinkInfo> *links = page->getLinks();
+  std::set<std::string> appendedlinkUrls;
   for (unsigned i=0; i<links->getLength(); i++) {
 
     LinkInfo *linkInfo = (*links)[i];
     char *linkUrl = linkInfo->url;
     TagType linkType = linkInfo->type;
 
-    if (strcmp(pageUrl, linkUrl)!=0) {
+    if (strcmp(pageUrl, linkUrl)!=0 && appendedlinkUrls.count(linkUrl)==0) {
       b2.append(BSON("url"<<linkUrl<<"type"<<linkTypes[linkType]));
+      appendedlinkUrls.insert(linkUrl);
     }
 
     delete[] linkUrl;
@@ -203,8 +209,9 @@ void failure (url *u, FetchError reason) {
 /** initialisation function
  */
 void initUserOutput () {
-
+#ifndef NDEBUG
   std::cout << "连接数据库 " << "..." << std::endl;
+#endif
   try {
     cc.connect("127.0.0.1");
     //std::cout << "Mogodb connected ok" << std::endl;
@@ -214,12 +221,16 @@ void initUserOutput () {
     return;
   }
 
+#ifndef NDEBUG
   std::cout << "清理数据..." << std::endl;
+#endif
   cc.remove("sitemap.failed", mongo::BSONObj(), false);
   cc.remove("sitemap.page", mongo::BSONObj(), false);
   cc.remove("sitemap.site", mongo::BSONObj(), false);
 
-  std::cout << "等待提供要爬的站点..." << std::endl;
+#ifndef NDEBUG
+  std::cout << "已准备就绪。" << std::endl;
+#endif
 }
 
 static void outputPage(mongo::DBClientConnection &cc, int fds, char *pageUrl, int indent, bool site, int siteIndex) {

@@ -33,6 +33,7 @@
 ///////////////////////////////////////////////////////////
 
 // define all the static variables
+bool global::daemonize;
 time_t global::now;
 hashTable *global::seen;
 #ifdef NO_DUP
@@ -100,21 +101,24 @@ global::global (int argc, char *argv[]) {
 	} else if (!strcmp(argv[pos], "-scratch")) {
 	  reload = false;
 	  pos++;
-	} else {
+	} else if (!strcmp(argv[pos], "-d")) {
+          daemonize = true;
+          pos++;
+        } else {
 	  break;
 	}
   }
   if (pos != argc) {
 	std::cerr << "用法 : " << argv[0];
-	std::cerr << " [-c configFile] [-scratch]\n";
+	std::cerr << " [-c configFile] [-scratch] [-d]\n";
 	exit(1);
   }
 
   // Standard values
   waitDuration = 60;
   depthInSite = 5;
-  userAgent = "larbin";
-  sender = "larbin@unspecified.mail";
+  userAgent = "sitemap";
+  sender = "joebin.don@gmail.com";
   nb_conn = 20;
   dnsConn = 3;
   httpPort = 0;

@@ -20,7 +20,7 @@ sitemap: $(ABS-UTILS-OBJ) $(ABS-FETCH-OBJ) $(ABS-INTERF-OBJ) $(ABS-MAIN-OBJ)
         -o sitemap $(ABS-UTILS-OBJ) \
 	$(ABS-FETCH-OBJ) $(ABS-INTERF-OBJ) $(ABS-MAIN-OBJ) \
         ../adns/libadns.a \
-        /usr/local/lib/libmongoclient.a \
+        /usr/lib/libmongoclient.a \
         /usr/local/lib/libboost_thread.a \
         /usr/local/lib/libboost_filesystem.a \
         /usr/local/lib/libboost_program_options.a \
