@@ -15,6 +15,7 @@
 #include <string.h>
 #include <signal.h>
 #include <ctype.h>
+#include <syslog.h>
 
 #include "options.h"
 
@@ -109,8 +110,7 @@ global::global (int argc, char *argv[]) {
 	}
   }
   if (pos != argc) {
-	std::cerr << "用法 : " << argv[0];
-	std::cerr << " [-c configFile] [-scratch] [-d]\n";
+	syslog(LOG_WARNING, "sitemap [-c configFile] [-scratch] [-d]");
 	exit(1);
   }
 
@@ -200,7 +200,7 @@ global::global (int argc, char *argv[]) {
   sn.sa_flags = SA_RESTART;
   sn.sa_handler = SIG_IGN;
   if (sigaction(SIGPIPE, &sn, &so)) {
-    std::cerr << "无法禁用 SIGPIPE : " << strerror(errno) << std::endl;
+    syslog(LOG_WARNING, "无法禁用 SIGPIPE");
   }
 }
 
@@ -214,8 +214,7 @@ global::~global () {
 void global::parseFile (char *file) {
   int fds = open(file, O_RDONLY);
   if (fds < 0) {
-	std::cerr << "无法打开配置文件 (" << file << ") : "
-         << strerror(errno) << std::endl;
+	syslog(LOG_ERR, "无法打开配置文件");
 	exit(1);
   }
   char *tmp = readfile(fds);
@@ -242,7 +241,7 @@ void global::parseFile (char *file) {
       if (u->isValid()) {
         check(NULL, u);
       } else {
-        std::cerr << "起始 url " << tok << " 无效\n";
+        syslog(LOG_ERR, "起始 url 无效");
         exit(1);
       }
 	} else if (!strcasecmp(tok, "waitduration")) {
@@ -256,7 +255,7 @@ void global::parseFile (char *file) {
 	  memset((char *) proxyAddr, 0, sizeof (struct sockaddr_in));
 	  if ((hp = gethostbyname(tok)) == NULL) {
 		endhostent();
-		std::cerr << "找不到代理 IP 地址 (" << tok << ")\n";
+		syslog(LOG_ERR, "找不到代理 IP 地址");
 		exit(1);
 	  } else {
 		proxyAddr->sin_family = hp->h_addrtype;
@@ -288,7 +287,7 @@ void global::parseFile (char *file) {
 	} else if (!strcasecmp(tok, "noExternalLinks")) {
 	  externalLinks = false;
 	} else {
-	  std::cerr << "配置文件无效 : " << tok << "\n";
+	  syslog(LOG_ERR, "配置文件无效");
 	  exit(1);
 	}
 	tok = nextToken(&posParse);
@@ -307,7 +306,7 @@ void global::manageDomain (char **posParse) {
 	tok = nextToken(posParse);
   }
   if (tok == NULL) {
-	std::cerr << "配置文件无效 : limitToDomain 无结束标志\n";
+	syslog(LOG_ERR, "配置文件无效 : limitToDomain 无结束标志");
 	exit(1);
   }
 }
@@ -326,7 +325,7 @@ void global::manageExt (char **posParse) {
 	tok = nextToken(posParse);
   }
   if (tok == NULL) {
-	std::cerr << "配置文件无效 : forbiddenExtensions 无结束标志\n";
+	syslog(LOG_ERR, "配置文件无效 : forbiddenExtensions 无结束标志");
 	exit(1);
   }
 }

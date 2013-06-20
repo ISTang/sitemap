@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <stdlib.h>
+#include <syslog.h>
 
 #include "utils/mypthread.h"
 
@@ -17,7 +18,7 @@ void startThread (StartFun run, void *arg) {
       || pthread_create(&t, &attr, run, arg) != 0
       || pthread_attr_destroy(&attr) != 0
       || pthread_detach(t) != 0) {
-    std::cerr << "Unable to launch a thread\n";
+    syslog(LOG_ERR, "Unable to launch a thread");
     exit(1);
   }
 }

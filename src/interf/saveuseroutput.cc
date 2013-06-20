@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string.h>
 #include <unistd.h>
+#include <syslog.h>
 
 #include "options.h"
 
@@ -52,7 +53,9 @@ void loaded (html *page) {
     strcpy(fileName+endFileName-5, "index");
     indexFds = creat(fileName, S_IRWXU);
     if (indexFds < 0) {
-      std::cerr << "cannot open file " << fileName << "\n";
+      char buf[1024];
+      sprintf(buf, "cannot open file %s", fileName);
+      syslog(LOG_ERR, buf);
       exit(1);
     }
     // new filename
@@ -61,8 +64,9 @@ void loaded (html *page) {
   }
   int fd = creat(fileName, S_IRWXU);
   if (fd < 0) {
-    std::cerr << "cannot open file " << fileName << "\n";
-    exit(1);
+      char buf[1024];
+      sprintf(buf, "cannot open file %s", fileName);
+      syslog(LOG_ERR, buf);
   }
   int s=0;
   s = sprintf(buf, "%4u ", nbfile);

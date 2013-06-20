@@ -1,6 +1,4 @@
-// Larbin
-// Sebastien Ailleret
-// 27-05-01 -> 04-01-02
+// Sitemap
 
 #include <string.h>
 #include <assert.h>
@@ -9,6 +7,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <iostream>
+#include <syslog.h>
 
 #include "types.h"
 #include "global.h"
@@ -49,8 +48,7 @@ PersistentFifo::PersistentFifo (bool reload, char *baseName) {
       fout = 0;
     }
     if (fin == fout && fin != 0) {
-      std::cerr << "previous crawl was too little, cannot reload state\n"
-           << "please restart larbin with -scratch option\n";
+      syslog(LOG_ERR, "previous crawl was too little, cannot reload state. please restart sitemap with -scratch option.");
       exit(1);
     }
 	closedir(dir);
@@ -184,8 +182,8 @@ char *PersistentFifo::readLine () {
   char *posn = strchr(buf + bufPos, '\n');
   while (posn == NULL) {
     if (!(bufEnd - bufPos < maxUrlSize + 40 + maxCookieSize)) {
-      printf(fileName);
-      printf(buf+bufPos);
+      syslog(LOG_INFO, fileName);
+      syslog(LOG_INFO, buf+bufPos);
     }
     if (bufPos*2 > BUF_SIZE) {
       bufEnd -= bufPos;
@@ -204,11 +202,12 @@ char *PersistentFifo::readLine () {
       case -1 :
         // We have a trouble here
         if (errno != EINTR) {
-          std::cerr << "Big Problem while reading (persistentFifo.h)\n";
-          perror("reason");
+          char buf[1024];
+          sprintf(buf, "Big Problem while reading (persistentFifo.h): %s", strerror(errno));
+          syslog(LOG_ERR, buf);
           assert(false);
         } else {
-          perror("Warning in PersistentFifo: ");
+          perror("Warning in PersistentFifo : ");
         }
         break;
       default:

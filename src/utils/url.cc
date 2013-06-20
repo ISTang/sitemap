@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <syslog.h>
 
 #include "options.h"
 
@@ -282,7 +283,9 @@ bool url::isValid () {
 
 /* print an URL */
 void url::print () {
-  printf("http://%s:%u%s\n", host, port, file);
+  char buf[4096];
+  sprintf(buf, "http://%s:%u%s\n", host, port, file);
+  syslog(LOG_INFO, buf);
 }
 
 /* Set depth to max if necessary

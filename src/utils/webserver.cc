@@ -21,6 +21,7 @@
 #include <fcntl.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <syslog.h>
 
 #include "options.h"
 
@@ -56,8 +57,7 @@ void *startWebserver (void *none) {
 	  || setsockopt(fds, SOL_SOCKET, SO_REUSEADDR, (char*)&nAllowReuse, sizeof(nAllowReuse))
 	  || bind(fds, (struct sockaddr *) &addr, sizeof(addr)) != 0
 	  || listen(fds, 4) != 0) {
-	std::cerr << "Unable to get the socket for the webserver (" << global::httpPort
-         << ") : " << strerror(errno) << std::endl;
+	syslog(LOG_ERR, "Unable to get the socket for the webserver");
 	exit(1);
   }
   // answer requests
@@ -67,10 +67,10 @@ void *startWebserver (void *none) {
 	uint len = sizeof(addr);
 	fdc = accept(fds, (struct sockaddr *) &addrc, &len);
 	if (fdc == -1) {
-	  std::cerr << "Trouble with web server...\n";
+	  syslog(LOG_WARNING, "Trouble with web server...");
 	} else {
-      manageAns(fdc, readRequest(fdc));
-      close(fdc);
+          manageAns(fdc, readRequest(fdc));
+          close(fdc);
 	}
   }
   return NULL;

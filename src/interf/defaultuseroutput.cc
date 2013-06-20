@@ -7,6 +7,7 @@
 #include <set>
 #include <iconv.h>
 #include <cstdlib>
+#include <syslog.h>
 #include <mongo/client/dbclient.h>
 
 #include "options.h"
@@ -44,13 +45,14 @@ void loaded (html *page) {
   // those char* are statically allocated, so you should copy
   // them if you want to keep them
   // in order to accept \000 in the page, you can use page->getLength()
-#ifdef BIGSTATS
-  std::cout << "已获取到 : ";
-  page->getUrl()->print();
-  std::cout << page->getHeaders() << "\n" << page->getPage() << "\n";
-#endif // BIGSTATS
-
   char *pageUrl = page->getUrl()->giveUrl();
+
+#ifdef BIGSTATS
+  char buf[4096];
+  sprintf(buf, "获取到页面 %s", pageUrl());
+  syslog(LOG_DEBUG, buf);
+  //std::cout << page->getHeaders() << "\n" << page->getPage() << "\n";
+#endif // BIGSTATS
 
   // skip duplicate page
 //#ifndef NDEBUG
@@ -124,7 +126,7 @@ void loaded (html *page) {
       iconv_t hIconv = iconv_open("UTF-8", pageEncoding);
       if (-1 == (long)hIconv ) {
 #ifndef NDEBUG
-        std::cerr<<"无法将页面 "<<pageUrl<<" 的标题从编码 "<<pageEncoding<<" 转换成编码 UTF-8"<<std::endl;
+        //std::cerr<<"无法将页面 "<<pageUrl<<" 的标题从编码 "<<pageEncoding<<" 转换成编码 UTF-8"<<std::endl;
 #endif
         //exit(3);
       } else {
@@ -146,14 +148,12 @@ void loaded (html *page) {
         iconv_close( hIconv );
       }
     }
-  } else {
-#ifndef NDEBUG
-    std::cout<<"页面 "<<pageUrl<<" 无标题"<<std::endl;
-#endif
   }
 
 #ifndef NDEBUG
-  std::cout<<"保存页面 "<<pageUrl<<"..."<<std::endl;
+  char buf[4096];
+  sprintf(buf, "保存页面 %s ...", pageUrl);
+  syslog(LOG_DEBUG, buf);
 #endif
   mongo::BSONObjBuilder b;
   b.append("url", pageUrl);
@@ -195,8 +195,8 @@ void loaded (html *page) {
 void failure (url *u, FetchError reason) {
   // Here should be the code for managing everything
 #ifdef BIGSTATS
-  std::cout << "获取失败 (" << (int)reason << ") : ";
-  u->print();
+  char buf[4096];
+  sprintf(buf, "获取 URL %s 失败 (%d)", u->getUrl(), (int)reason);
 #endif // BIGSTATS
 
   char *url = u->giveUrl();
@@ -210,26 +210,26 @@ void failure (url *u, FetchError reason) {
  */
 void initUserOutput () {
 #ifndef NDEBUG
-  std::cout << "连接数据库 " << "..." << std::endl;
+  syslog(LOG_INFO, "连接数据库...");
 #endif
   try {
     cc.connect("127.0.0.1");
     //std::cout << "Mogodb connected ok" << std::endl;
   } catch( const mongo::DBException &e ) {
-    std::cout << "连接数据库失败: " << e.what() << std::endl;
+    syslog(LOG_ERR, "连接数据库失败");
     exit(2);
     return;
   }
 
 #ifndef NDEBUG
-  std::cout << "清理数据..." << std::endl;
+  syslog(LOG_INFO, "清理数据...");
 #endif
   cc.remove("sitemap.failed", mongo::BSONObj(), false);
   cc.remove("sitemap.page", mongo::BSONObj(), false);
   cc.remove("sitemap.site", mongo::BSONObj(), false);
 
 #ifndef NDEBUG
-  std::cout << "已准备就绪。" << std::endl;
+  syslog(LOG_INFO, "已准备就绪。");
 #endif
 }
 

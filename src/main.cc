@@ -66,9 +66,12 @@ int main (int argc, char *argv[]) {
 
   global glob(argc, argv);
 
-  if (global::daemonize) daemonize();
-
-  printf("Sitemap已经启动。");
+  if (global::daemonize) {
+    daemonize();
+    syslog(LOG_INFO, "Sitemap 已经启动。");
+  } else {
+    printf("Sitemap 已经启动。");
+  }
 
 #ifdef PROF
   signal (2, handler);
@@ -166,7 +169,7 @@ static void cron () {
 #endif // NDEBUG
 
 #ifdef STATS
-    printf("\n%sURL : %d  (比率 : %d)\n页面 : %d  (比率 : %d)\n成功 : %d  (比率 : %d)\n",
+    syslog(LOG_NOTICE, "\n%sURL : %d  (比率 : %d)\n页面 : %d  (比率 : %d)\n成功 : %d  (比率 : %d)\n",
            ctime(&global::now), urls, urlsRate, pages, pagesRate,
            answers[success], successRate);
 #endif // STATS
@@ -185,14 +188,14 @@ void daemonize()
 
 	/* fork to put us in the background (whether or not the user specified '&' on the command line */
 	if ((childpid = fork()) < 0) {
-		std::cerr<<"Failed to fork first children."<<std::endl;
+		syslog(LOG_EMERG, "Failed to fork first children.");
 		exit(1);
 	} else if (childpid > 0)
 		exit(0); /* terminate parent, continue in child */
 
 	/* dissociate from process group */
 	if (setsid()<0) {
-		std::cerr<<"Failed to become process group leader."<<std::endl;
+		syslog(LOG_EMERG, "Failed to become process group leader.");
 		exit(1);
 	}
 

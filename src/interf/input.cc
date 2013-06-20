@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <syslog.h>
 
 #include "options.h"
 
@@ -200,8 +201,7 @@ void initInput () {
                       (char*)&allowReuse, sizeof(allowReuse))
         || bind(inputFds, (struct sockaddr *) &addr, sizeof(addr)) != 0
         || listen(inputFds, 4) != 0) {
-      std::cerr << "不能获得输入套结字(端口 " << global::inputPort
-           << ") : " << strerror(errno) << "\n";
+      syslog(LOG_ERR, "不能获得输入套结字");
       exit(1);
     }
     fcntl(inputFds, F_SETFL, O_NONBLOCK);

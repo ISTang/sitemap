@@ -42,16 +42,18 @@ void check (url *here, url *u) {
 	}
 #else // not a SPECIFICSEARCH
     bool save = true;
-    char *hereHost = here->getHost();
-    char *targetHost = u->getHost();
-    char *pHereDomainName = strchr(hereHost, '.');
-    char *pTargetDomainName = strchr(targetHost, '.');
-    if (pHereDomainName && pTargetDomainName) {
-      pHereDomainName++;
-      pTargetDomainName++;
-      int minLen = std::min(strlen(pHereDomainName), strlen(pTargetDomainName));
-      if (strncmp(pHereDomainName, pTargetDomainName, minLen)) {
-        save = false;
+    if (here!=NULL) {
+      char *hereHost = here->getHost();
+      char *targetHost = u->getHost();
+      char *pHereDomainName = strchr(hereHost, '.');
+      char *pTargetDomainName = strchr(targetHost, '.');
+      if (pHereDomainName && pTargetDomainName) {
+        pHereDomainName++;
+        pTargetDomainName++;
+        int minLen = std::min(strlen(pHereDomainName), strlen(pTargetDomainName));
+        if (strncmp(pHereDomainName, pTargetDomainName, minLen)) {
+          save = false;
+        }
       }
     }
     if (save) {

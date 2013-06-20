@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <syslog.h>
 
 #include "options.h"
 
@@ -29,7 +30,9 @@ hashTable::hashTable (bool create) {
   } else {
 	int fds = open("hashtable.bak", O_RDONLY);
 	if (fds < 0) {
-	  std::cerr << "找不到 hashtable.bak, 从头开始\n";
+#ifndef NDEBUG
+	  syslog(LOG_WARNING, "找不到 hashtable.bak, 从头开始");
+#endif
       for (ssize_t i=0; i<hashSize/8; i++) {
         table[i] = 0;
       }
@@ -38,8 +41,7 @@ hashTable::hashTable (bool create) {
       while (sr < total) {
         ssize_t tmp = read(fds, table+sr, total-sr);
         if (tmp <= 0) {
-          std::cerr << "无法读取 hashtable.bak : "
-               << strerror(errno) << std::endl;
+          syslog(LOG_ERR, "无法读取 hashtable.bak");
           exit(1);
         } else {
           sr += tmp;

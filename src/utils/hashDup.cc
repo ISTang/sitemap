@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <syslog.h>
 
 #include "types.h"
 #include "utils/hashDup.h"
@@ -27,17 +28,21 @@ hashDup::hashDup (ssize_t size, char *init, bool scratch) {
     }
   } else {
     int fds = open(init, O_RDONLY);
-	if (fds < 0) {
-	  std::cerr << "找不到 " << init << ", 从头开始\n";
-      for (ssize_t i=0; i<size/8; i++) {
-        table[i] = 0;
-      }
+    if (fds < 0) {
+          char buf[1024];
+	  sprintf(buf, "找不到 %s 从头开始", init);
+          syslog(LOG_WARNING, buf);
+          for (ssize_t i=0; i<size/8; i++) {
+            table[i] = 0;
+          }
     } else {
       ssize_t sr = 0;
       while (sr < size) {
         ssize_t tmp = read(fds, table+sr, size-sr);
         if (tmp <= 0) {
-          std::cerr << "无法读取 " << init << "\n";
+          char buf[1024];
+          sprintf(buf, "无法读取 %s", init);
+          syslog(LOG_ERR, buf);
           exit(1);
         } else {
           sr += 8*tmp;
