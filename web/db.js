@@ -14,6 +14,7 @@ var url = require('url');
 var config = require(__dirname + '/config');
 var utils = require(__dirname + '/utils');
 
+exports.openDatabase = openDatabase;
 exports.getAllSites = getAllSites;
 exports.getPages = getPages;
 //exports.getResources = getResources;
@@ -77,30 +78,36 @@ function getAllSites(handleResult) {
     });
 }
 
-function countChildPageResources(collection, pageUrl, rescure, handleResult) {
+function countChildPageResources(collection, urls, pageUrl, rescure, handleResult) {
 
-	collection.findOne({url: pageUrl}).toArray(function (err, page) {
+	//log("正在查找页面"+pageUrl+"...");
+	collection.findOne({url: pageUrl}, function (err, page) {
 	
 		if (err) return handleResult(err);
 	
 		if (!page || !page.links) return handleResult(null, 0);
 		
+		var sum = 0;
 		var childPageUrls = [];
 		for (var linkIndex in page.links) {
 
 			var link = page.links[linkIndex];
-			if (link.type in ["anchor", "frame", "iframe"]) {
+
+			if (urls.contains(link.url)) continue;
+			urls.add(link.url);
+			sum++;
+
+			if (link.type=="anchor" || link.type=="frame" || link.type=="iframe") {
 			
 				childPageUrls.push(link.url);
 			}
 		}
 		
-		var sum = page.links.length;
 		if (childPageUrls.length!=0 && rescure) {
 		
-			asyns.forEachSeriers(childPageUrls, function (childPageUrl, callback) {
+			async.forEachSeries(childPageUrls, function (childPageUrl, callback) {
 			
-				countChildPageResources(collection, childPageUrl, function (err, count) {
+				countChildPageResources(collection, urls, childPageUrl, rescure, function (err, count) {
 				
 					if (err) return callback(err);
 					sum += count;
@@ -120,13 +127,34 @@ function countChildPageResources(collection, pageUrl, rescure, handleResult) {
 
 function countSiteResources(siteUrl, rescure, handleResult) {
 
+    log("正在统计站点 "+siteUrl+" 资源个数...");
     db.collection("page", {safe:false}, function(err, collection){
 
 		if (err) return handleResult(err);
-		countChildPageResources(collection, siteUrl, rescure, function (err, count) {
+		var urls = new hashes.HashSet();
+		urls.add(siteUrl);
+		countChildPageResources(collection, urls, siteUrl, rescure, function (err, count) {
 			
 			handleResult(err, 1+count);
 		});
+    });
+}
+
+function openDatabase(callback) {
+    db = new mongo.Db("sitemap", new mongo.Server(MONGO_SERVER, MONGO_PORT), {safe:true});
+
+    log("正在连接数据库...");
+    db.open(function(err, p_client) {
+
+      	if (err) {
+
+		log("无法打开数据库: "+err);
+		return callback(err);
+	} else {
+
+		log("已连接到数据库。");
+      		callback();
+	}
     });
 }
 
@@ -136,15 +164,4 @@ function main(fn) {
 
 void main(function () {
 
-    db = new mongo.Db("sitemap", new mongo.Server(MONGO_SERVER, MONGO_PORT), {safe:true});
-
-    log("正在连接数据库...");
-    db.open(function(err, p_client) {
-      if (err) {
-        log(err);
-        process.exit(1);
-        return;
-      }
-      log("已连接到数据库。");
-    });
 });
