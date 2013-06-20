@@ -17,6 +17,7 @@ var utils = require(__dirname + '/utils');
 exports.getAllSites = getAllSites;
 exports.getPages = getPages;
 //exports.getResources = getResources;
+exports.countSiteResources = countSiteResources;
 
 const MONGO_SERVER = config.MONGO_SERVER;
 const MONGO_PORT = config.MONGO_PORT;
@@ -57,7 +58,7 @@ function getPages(pageUrl,handleResult) {
  */
 function getAllSites(handleResult) {
     var root = {id:"root",name:"根", children:[]};
-    db.collection("site", {safe:true}, function(err, collection){
+    db.collection("site", {safe:false}, function(err, collection){
         if (err) return handleResult(err);
         collection.find().toArray(function (err, sites) {
             if (err) return handleResult(err);
@@ -73,6 +74,59 @@ function getAllSites(handleResult) {
             }
             handleResult(null, root);
         });
+    });
+}
+
+function countChildPageResources(collection, pageUrl, rescure, handleResult) {
+
+	collection.findOne({url: pageUrl}).toArray(function (err, page) {
+	
+		if (err) return handleResult(err);
+	
+		if (!page || !page.links) return handleResult(null, 0);
+		
+		var childPageUrls = [];
+		for (var linkIndex in page.links) {
+
+			var link = page.links[linkIndex];
+			if (link.type in ["anchor", "frame", "iframe"]) {
+			
+				childPageUrls.push(link.url);
+			}
+		}
+		
+		var sum = page.links.length;
+		if (childPageUrls.length!=0 && rescure) {
+		
+			asyns.forEachSeriers(childPageUrls, function (childPageUrl, callback) {
+			
+				countChildPageResources(collection, childPageUrl, function (err, count) {
+				
+					if (err) return callback(err);
+					sum += count;
+					callback();
+				});
+			}, function (err) {
+			
+				handleResult(err, sum);
+			});
+
+		} else {
+		
+			handleResult(null, sum);
+		}
+	});
+}
+
+function countSiteResources(siteUrl, rescure, handleResult) {
+
+    db.collection("page", {safe:false}, function(err, collection){
+
+		if (err) return handleResult(err);
+		countChildPageResources(collection, siteUrl, rescure, function (err, count) {
+			
+			handleResult(err, 1+count);
+		});
     });
 }
 
