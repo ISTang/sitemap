@@ -10,6 +10,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <syslog.h>
 
 #include "options.h"
 
@@ -36,6 +37,9 @@ void initSite () {
  * return the state of the socket
  */
 static char getFds (Connexion *conn, struct in_addr *addr, uint port) {
+  char ipInfo[64];
+  sprintf(ipInfo, "%s:%d", inet_ntoa(addr->saddr), port);
+
   memcpy (&stataddr.sin_addr,
           addr,
           sizeof (struct in_addr));
@@ -193,6 +197,9 @@ void NamedSite::newQuery () {
 	}
   } else {
     // submit an adns query
+    char buf[512];
+    sprintf(buf, "Submitting adns query of domain \"%s\"...", name);
+    syslog(LOG_INFO, buf);
     global::nbDnsCalls++;
     adns_query quer = NULL;
     adns_submit(global::ads, name,
@@ -212,6 +219,9 @@ void NamedSite::dnsAns (adns_answer *ans) {
       cname = newString(ans->cname);
       global::nbDnsCalls++;
       adns_query quer = NULL;
+      char buf[512];
+      sprintf(buf, "Finding ip for cname \"%s\" of domain \"%s\"...", cname, name);
+      syslog(LOG_INFO, buf);
       adns_submit(global::ads, cname,
                   (adns_rrtype) adns_r_addr,
                   (adns_queryflags) 0,
@@ -219,6 +229,9 @@ void NamedSite::dnsAns (adns_answer *ans) {
     } else {
       // dns chains too long => dns error
       // cf nslookup or host for more information
+      char buf[512];
+      sprintf(buf, "adns query failed(dns chains too long): %s");
+      syslog(LOG_WARNING, buf);
       siteSeen();
       delete [] cname; cname = NULL;
       dnsState = errorDns;
@@ -229,6 +242,9 @@ void NamedSite::dnsAns (adns_answer *ans) {
     if (cname != NULL) { delete [] cname; cname = NULL; }
     if (ans->status != adns_s_ok) {
       // No addr inet
+      char buf[512];
+      sprintf(buf, "adns query failed(no addr inet): %s");
+      syslog(LOG_WARNING, buf);
       dnsState = errorDns;
       dnsErr();
     } else {
@@ -237,6 +253,9 @@ void NamedSite::dnsAns (adns_answer *ans) {
       memcpy (&addr,
               &ans->rrs.addr->addr.inet.sin_addr,
               sizeof (struct in_addr));
+      char buf[512];
+      sprintf(buf, "adns query success: %s --> %s", name, addr);
+      syslog(LOG_INFO, buf);
       // Get the robots.txt
       dnsOK();
     }
