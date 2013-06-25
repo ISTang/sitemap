@@ -37,10 +37,10 @@ void main(function () {
 
 		if (err) process.exit(2);
 
-		db.countSiteResources(process.argv[2], true, function (err, count) {
+		db.countSite(process.argv[2], true, function (err, okPageCount, unknownPageCount, resCount) {
 	
 			if (err) log(err);
-			else log("总共 "+count+" 个资源。");
+			else log("总共 "+(okPageCount+unknownPageCount)+" 个页面(其中 "+okPageCount+" 个已加载，"+unknownPageCount+" 尚未加载)，"+resCount+" 个资源。");
 
 			process.exit(0);
 		});

@@ -21,7 +21,7 @@
 #define maxIPUrls 80000  // this should allow less dns call
 
 // Max number of urls per site in Url
-#define maxUrlsBySite 40  // must fit in uint8_t
+#define maxUrlsBySite 254  // must fit in uint8_t
 
 // time out when reading a page (in sec)
 #define timeoutPage 30   // default time out

@@ -48,7 +48,7 @@ void loaded (html *page) {
   char *pageUrl = page->getUrl()->giveUrl();
 
 #ifdef BIGSTATS
-  char buf[4096];
+  char buf[1024];
   sprintf(buf, "获取到页面 %s", pageUrl());
   syslog(LOG_DEBUG, buf);
   //std::cout << page->getHeaders() << "\n" << page->getPage() << "\n";
@@ -151,15 +151,15 @@ void loaded (html *page) {
   }
 
 #ifndef NDEBUG
-  char buf[4096];
-  sprintf(buf, "保存页面 %s ...", pageUrl);
-  syslog(LOG_DEBUG, buf);
+  //char buf[1024];
+  //sprintf(buf, "保存页面 %s ...", pageUrl);
+  //syslog(LOG_DEBUG, buf); /问题：频率高了容易导致内存故障？
 #endif
   mongo::BSONObjBuilder b;
   b.append("url", pageUrl);
   b.append("title", (pageTitle==NULL?"":pageTitle));
 
-  mongo::BSONArrayBuilder b2;
+  mongo::BSONArrayBuilder b2, b3;
   Vector<LinkInfo> *links = page->getLinks();
   std::set<std::string> appendedlinkUrls;
   for (unsigned i=0; i<links->getLength(); i++) {
@@ -169,14 +169,22 @@ void loaded (html *page) {
     TagType linkType = linkInfo->type;
 
     if (strcmp(pageUrl, linkUrl)!=0 && appendedlinkUrls.count(linkUrl)==0) {
-      b2.append(BSON("url"<<linkUrl<<"type"<<linkTypes[linkType]));
+
+      if (linkType!=ttAnchor && linkType!=ttFrame && linkType!=ttIFrame) {
+
+        b2.append(BSON("url"<<linkUrl<<"type"<<linkTypes[linkType]));
+      } else {
+
+        b3.append(BSON("url"<<linkUrl<<"type"<<linkTypes[linkType]));
+      }
       appendedlinkUrls.insert(linkUrl);
     }
 
     delete[] linkUrl;
   }
 
-  b.append("links", b2.arr());
+  b.append("links_res", b2.arr());
+  b.append("links_page", b3.arr());
   cc.insert("sitemap.page", b.obj());
   cc.ensureIndex("sitemap.page", BSON("url"<<1));
 
@@ -195,7 +203,7 @@ void loaded (html *page) {
 void failure (url *u, FetchError reason) {
   // Here should be the code for managing everything
 #ifdef BIGSTATS
-  char buf[4096];
+  char buf[1024];
   sprintf(buf, "获取 URL %s 失败 (%d)", u->getUrl(), (int)reason);
 #endif // BIGSTATS
 
@@ -284,11 +292,10 @@ static void outputPage(mongo::DBClientConnection &cc, int fds, char *pageUrl, in
 
   if (site) return;
 
-  mongo::BSONElement linksElement = obj.getField("links");
-  if (!linksElement.eoo() && linksElement.type()==mongo::Array) {
+  mongo::BSONElement pageLinksElement = obj.getField("links_page");
+  if (!pageLinksElement.eoo() && pageLinksElement.type()==mongo::Array) {
 
-    std::vector<std::string> pageUrls;
-    std::vector<mongo::BSONElement> links = linksElement.Array();
+    std::vector<mongo::BSONElement> links = pageLinksElement.Array();
     int linkIndex = 1;
     for (std::vector<mongo::BSONElement>::iterator it=links.begin(); it!=links.end(); ++it) {
 
@@ -299,7 +306,7 @@ static void outputPage(mongo::DBClientConnection &cc, int fds, char *pageUrl, in
 
       for (int i=0; i<indent*2; i++) ecrire(fds, "&nbsp;");
 
-      ecrire(fds, "#");
+      ecrire(fds, "页面 #");
       ecrireInt(fds, linkIndex++);
       ecrire(fds, ": [");
       ecrire(fds, (char *)type);
@@ -309,15 +316,40 @@ static void outputPage(mongo::DBClientConnection &cc, int fds, char *pageUrl, in
       ecrire(fds, (char*)linkUrl);
       ecrire(fds, "</a>");
 
-      if (!strcmp(type, "anchor")||!strcmp(type, "iframe")||!strcmp(type, "frame")) {
+      ecrire(fds, "&nbsp;&nbsp;");
+      ecrire(fds, "<a target=\"_blank\" href=\"/output.html?");
+      ecrire(fds, (char *)linkUrl);
+      ecrire(fds, "\">");
+      ecrire(fds, "详细");
+      ecrire(fds, "</a>");
 
-        ecrire(fds, "&nbsp;&nbsp;");
-        ecrire(fds, "<a target=\"_blank\" href=\"/output.html?");
-        ecrire(fds, (char *)linkUrl);
-        ecrire(fds, "\">");
-        ecrire(fds, "详细");
-        ecrire(fds, "</a>");
-      }
+      ecrire(fds, "</br>");
+    }
+  }
+
+  mongo::BSONElement resLinksElement = obj.getField("links_res");
+  if (!resLinksElement.eoo() && resLinksElement.type()==mongo::Array) {
+
+    std::vector<mongo::BSONElement> links = resLinksElement.Array();
+    int linkIndex = 1;
+    for (std::vector<mongo::BSONElement>::iterator it=links.begin(); it!=links.end(); ++it) {
+
+      const char *linkUrl = (*it)["url"].str().c_str();
+      const char *type = (*it)["type"].str().c_str();
+
+      ecrire(fds, "<br>");
+
+      for (int i=0; i<indent*2; i++) ecrire(fds, "&nbsp;");
+
+      ecrire(fds, "资源 #");
+      ecrireInt(fds, linkIndex++);
+      ecrire(fds, ": [");
+      ecrire(fds, (char *)type);
+      ecrire(fds, "] <a target=\"_blank\" href=\"");
+      ecrire(fds, (char *)linkUrl);
+      ecrire(fds, "\">");
+      ecrire(fds, (char*)linkUrl);
+      ecrire(fds, "</a>");
 
       ecrire(fds, "</br>");
     }

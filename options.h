@@ -88,7 +88,7 @@
 // if this option is set, sitemap saves the hashtable from time to time
 // this way it can restart from where it last stopped
 // by reloading the table
-//#define RELOAD
+#define RELOAD
 
 
 //////////////////////////////////////////////////////////

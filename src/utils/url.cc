@@ -283,7 +283,7 @@ bool url::isValid () {
 
 /* print an URL */
 void url::print () {
-  char buf[4096];
+  char buf[1024];
   sprintf(buf, "http://%s:%u%s\n", host, port, file);
   syslog(LOG_INFO, buf);
 }

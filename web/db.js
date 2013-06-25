@@ -18,7 +18,7 @@ exports.openDatabase = openDatabase;
 exports.getAllSites = getAllSites;
 exports.getPages = getPages;
 //exports.getResources = getResources;
-exports.countSiteResources = countSiteResources;
+exports.countSite = countSite;
 
 const MONGO_SERVER = config.MONGO_SERVER;
 const MONGO_PORT = config.MONGO_PORT;
@@ -78,64 +78,76 @@ function getAllSites(handleResult) {
     });
 }
 
-function countChildPageResources(collection, urls, pageUrl, rescure, handleResult) {
+function countChildPage(collection, pageUrls, resUrls, pageUrl, rescure, handleResult) {
 
-	//log("正在查找页面"+pageUrl+"...");
+	//log("正在查找页面 "+pageUrl+"...");
 	collection.findOne({url: pageUrl}, function (err, page) {
 	
 		if (err) return handleResult(err);
 	
-		if (!page || !page.links) return handleResult(null, 0);
-		
-		var sum = 0;
-		var childPageUrls = [];
-		for (var linkIndex in page.links) {
+		if (page==null)  {
 
-			var link = page.links[linkIndex];
+			//log("页面 "+pageUrl+" 尚未爬出!");
+			return handleResult(null, 0, 1, 0);
+		}
 
-			if (urls.contains(link.url)) continue;
-			urls.add(link.url);
-			sum++;
+		var okPageSum = 1, unknownPageSum = 0, resSum = 0;
 
-			if (link.type=="anchor" || link.type=="frame" || link.type=="iframe") {
-			
-				childPageUrls.push(link.url);
-			}
+		for (var linkIndex in page.links_res) {
+
+			var link = page.links_res[linkIndex];
+
+			if (resUrls.contains(link.url)) continue;
+
+			resUrls.add(link.url);
+			resSum++;
 		}
 		
-		if (childPageUrls.length!=0 && rescure) {
-		
-			async.forEachSeries(childPageUrls, function (childPageUrl, callback) {
+		async.forEachSeries(page.links_page, function (childPage, callback) {
 			
-				countChildPageResources(collection, urls, childPageUrl, rescure, function (err, count) {
-				
+                        var childPageUrl = childPage.url;
+
+                        if (pageUrls.contains(childPageUrl)) return callback();
+
+                        pageUrls.add(childPageUrl);
+
+			if (rescure) {
+
+				countChildPage(collection, pageUrls, resUrls, childPageUrl, rescure, function (err, okPageCount, unknownPageCount, resCount) {
+					
 					if (err) return callback(err);
-					sum += count;
+
+					okPageSum += okPageCount;
+					unknownPageSum += unknownPageCount;
+					resSum += resCount;
+
 					callback();
 				});
-			}, function (err) {
-			
-				handleResult(err, sum);
-			});
+			} else {
 
-		} else {
-		
-			handleResult(null, sum);
-		}
+				callback();
+			}
+		}, function (err) {
+			
+			handleResult(err, okPageSum, unknownPageSum, resSum);
+		});
+
 	});
 }
 
-function countSiteResources(siteUrl, rescure, handleResult) {
+function countSite(siteUrl, rescure, handleResult) {
 
-    log("正在统计站点 "+siteUrl+" 资源个数...");
+    log("正在统计站点 "+siteUrl+" 页面/资源个数...");
     db.collection("page", {safe:false}, function(err, collection){
 
 		if (err) return handleResult(err);
-		var urls = new hashes.HashSet();
-		urls.add(siteUrl);
-		countChildPageResources(collection, urls, siteUrl, rescure, function (err, count) {
+
+		var pageUrls = new hashes.HashSet();
+                var resUrls = new hashes.HashSet();
+		pageUrls.add(siteUrl);
+		countChildPage(collection, pageUrls, resUrls, siteUrl, rescure, function (err, okPageCount, unknownPageCount, resCount) {
 			
-			handleResult(err, 1+count);
+			handleResult(err, okPageCount, unknownPageCount, resCount);
 		});
     });
 }
