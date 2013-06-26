@@ -2,3 +2,4 @@ fifo*
 *.o
 logs
 .idea
+.bak

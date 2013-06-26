@@ -57,7 +57,7 @@ void check (url *here, url *u) {
       }
     }
     if (save) {
-      //if (here!=NULL) u->tag = here->tag;
+      if (here!=NULL) u->tag = here->tag;
       global::URLsDisk->put(u);
     }
 #endif

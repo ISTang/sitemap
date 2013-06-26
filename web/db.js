@@ -19,6 +19,7 @@ exports.getAllSites = getAllSites;
 exports.getPages = getPages;
 //exports.getResources = getResources;
 exports.countSite = countSite;
+exports.countSite2 = countSite2;
 
 const MONGO_SERVER = config.MONGO_SERVER;
 const MONGO_PORT = config.MONGO_PORT;
@@ -149,6 +150,21 @@ function countSite(siteUrl, rescure, handleResult) {
 			
 			handleResult(err, okPageCount, unknownPageCount, resCount);
 		});
+    });
+}
+
+function countSite2(siteUrl, handleResult) {
+
+    log("正在统计站点 "+siteUrl+" 页面/资源个数...");
+    db.collection("site", {safe:false}, function(err, collection){
+
+        if (err) return handleResult(err);
+
+        collection.findOne({url:siteUrl}, function (err, site) {
+
+            if (err) return handleResult(err);
+            handleResult(null, site.links_page.length, site.links_res.length);
+        });
     });
 }
 

@@ -155,6 +155,11 @@ void loaded (html *page) {
   //sprintf(buf, "保存页面 %s ...", pageUrl);
   //syslog(LOG_DEBUG, buf); /问题：频率高了容易导致内存故障？
 #endif
+  if (page->getUrl()->tag>0 && cc.count("sitemap.site", BSON("tag"<<page->getUrl()->tag))==0) {
+
+    cc.insert("sitemap.site", BSON("url"<<pageUrl<<"tag"<<page->getUrl()->tag));
+  }
+
   mongo::BSONObjBuilder b;
   b.append("url", pageUrl);
   b.append("title", (pageTitle==NULL?"":pageTitle));
@@ -172,9 +177,13 @@ void loaded (html *page) {
 
       if (linkType!=ttAnchor && linkType!=ttFrame && linkType!=ttIFrame) {
 
+        if (page->getUrl()->tag>0)
+          cc.update("sitemap.site", QUERY("tag"<<page->getUrl()->tag), BSON("$addToSet"<<BSON("links_res"<<linkUrl)), true);
         b2.append(BSON("url"<<linkUrl<<"type"<<linkTypes[linkType]));
       } else {
 
+        if (page->getUrl()->tag>0)
+          cc.update("sitemap.site", QUERY("tag"<<page->getUrl()->tag), BSON("$addToSet"<<BSON("links_page"<<linkUrl)), true);
         b3.append(BSON("url"<<linkUrl<<"type"<<linkTypes[linkType]));
       }
       appendedlinkUrls.insert(linkUrl);
@@ -187,11 +196,6 @@ void loaded (html *page) {
   b.append("links_page", b3.arr());
   cc.insert("sitemap.page", b.obj());
   cc.ensureIndex("sitemap.page", BSON("url"<<1));
-
-  if (page->getUrl()->tag>0) {
-
-    cc.insert("sitemap.site", BSON("url"<<pageUrl<<"tag"<<page->getUrl()->tag));
-  }
 
   delete[] pageUrl;
 }
