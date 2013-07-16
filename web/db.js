@@ -163,6 +163,7 @@ function countSite2(siteUrl, handleResult) {
         collection.findOne({url:siteUrl}, function (err, site) {
 
             if (err) return handleResult(err);
+            if (site==null) return handleResult("该站点不存在！")
             handleResult(null, site.links_page.length, site.links_res.length);
         });
     });

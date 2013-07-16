@@ -18,69 +18,71 @@
 #include "utils/connexion.h"
 
 /* constructor */
-hashDup::hashDup (ssize_t size, char *init, bool scratch) {
-  this->size = size;
-  file = init;
-  table = new char[size / 8];
-  if (init == NULL || scratch) {
-    for (ssize_t i=0; i<size/8; i++) {
-      table[i] = 0;
-    }
-  } else {
-    int fds = open(init, O_RDONLY);
-    if (fds < 0) {
-          char buf[1024];
-	  sprintf(buf, "找不到 %s 从头开始", init);
-          syslog(LOG_WARNING, buf);
-          for (ssize_t i=0; i<size/8; i++) {
-            table[i] = 0;
-          }
-    } else {
-      ssize_t sr = 0;
-      while (sr < size) {
-        ssize_t tmp = read(fds, table+sr, size-sr);
-        if (tmp <= 0) {
-          char buf[1024];
-          sprintf(buf, "无法读取 %s", init);
-          syslog(LOG_ERR, buf);
-          exit(1);
-        } else {
-          sr += 8*tmp;
-        }
-      }
-      close(fds);
-    }
-  }
+hashDup::hashDup(ssize_t size, char *init, bool scratch) {
+	this->size = size;
+	file = init;
+	table = new char[size / 8];
+	if (init == NULL || scratch) {
+		for (ssize_t i = 0; i < size / 8; i++) {
+			table[i] = 0;
+		}
+	} else {
+		int fds = open(init, O_RDONLY);
+		if (fds < 0) {
+			char buf[1024];
+			sprintf(buf, "找不到 %s 从头开始", init);
+			syslog(LOG_WARNING, buf);
+			//
+			for (ssize_t i = 0; i < size / 8; i++) {
+				table[i] = 0;
+			}
+		} else {
+			ssize_t sr = 0;
+			while (sr < size) {
+				ssize_t tmp = read(fds, table + sr, size - sr);
+				if (tmp <= 0) {
+					char buf[1024];
+					sprintf(buf, "无法读取 %s", init);
+					syslog(LOG_ERR, buf);
+					//
+					exit(1);
+				} else {
+					sr += 8 * tmp;
+				}
+			}
+			close(fds);
+		}
+	}
 }
 
 /* destructor */
-hashDup::~hashDup () {
-  delete [] table;
+hashDup::~hashDup() {
+	delete[] table;
 }
 
 /* set a page in the hashtable
  * return false if it was already there
  * return true if it was not (ie it is new)
  */
-bool hashDup::testSet (char *doc) {
-  unsigned int code = 0;
-  char c;
-  for (uint i=0; (c=doc[i])!=0; i++) {
-    if (c>'A' && c<'z')
-      code = (code*23 + c) % size;
-  }
-  unsigned int pos = code / 8;
-  unsigned int bits = 1 << (code % 8);
-  int res = table[pos] & bits;
-  table[pos] |= bits;
-  return !res;
+bool hashDup::testSet(char *doc) {
+	unsigned int code = 0;
+	char c;
+	for (uint i = 0; (c = doc[i]) != 0; i++) {
+		if (c > 'A' && c < 'z')
+			code = (code * 23 + c) % size;
+	}
+	unsigned int pos = code / 8;
+	unsigned int bits = 1 << (code % 8);
+	int res = table[pos] & bits;
+	table[pos] |= bits;
+	return !res;
 }
 
 /* save in a file */
-void hashDup::save () {
-  int fds = creat(file, 00600);
-  if (fds >= 0) {
-    ecrireBuff(fds, table, size/8);
-	close(fds);
-  }
+void hashDup::save() {
+	int fds = creat(file, 00600);
+	if (fds >= 0) {
+		ecrireBuff(fds, table, size / 8);
+		close(fds);
+	}
 }

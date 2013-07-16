@@ -22,6 +22,7 @@
 #include "interf/output.h"
 #include "fetch/site.h"
 
+#include "interf/useroutput.h"
 
 /////////////////////////////////////////////////////////
 // functions used for the 2 types of sites
@@ -29,49 +30,43 @@
 
 static struct sockaddr_in stataddr;
 
-void initSite () {
-  stataddr.sin_family = AF_INET;
+void initSite() {
+	stataddr.sin_family = AF_INET;
 }
 
 /** connect to this addr using connection conn 
  * return the state of the socket
  */
-static char getFds (Connexion *conn, struct in_addr *addr, uint port) {
-  char ipInfo[64];
-  sprintf(ipInfo, "%s:%d", inet_ntoa(addr->saddr), port);
-
-  memcpy (&stataddr.sin_addr,
-          addr,
-          sizeof (struct in_addr));
-  stataddr.sin_port = htons(port);
-  int fd = socket(AF_INET, SOCK_STREAM, 0);
-  if (fd < 0)
-    return emptyC;
-  else
-    global::verifMax(fd);
-  conn->socket = fd;
-  for (;;) {
-    fcntl(fd, F_SETFL, O_NONBLOCK);
-    struct sockaddr_in *theaddr;
-    if (global::proxyAddr != NULL)
-      theaddr = global::proxyAddr;
-    else
-      theaddr = &stataddr;
-    if (connect(fd, (struct sockaddr*) theaddr,
-                sizeof (struct sockaddr_in)) == 0) {
-      // success
-      return writeC;
-    } else if (errno == EINPROGRESS) {
-      // would block
-      return connectingC;
-    } else {
-      // error
-      (void) close(fd);
-      return emptyC;
-    }
-  }
+static char getFds(Connexion *conn, struct in_addr *addr, uint port) {
+	memcpy(&stataddr.sin_addr, addr, sizeof(struct in_addr));
+	stataddr.sin_port = htons(port);
+	int fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (fd < 0)
+		return emptyC;
+	else
+		global::verifMax(fd);
+	conn->socket = fd;
+	for (;;) {
+		fcntl(fd, F_SETFL, O_NONBLOCK);
+		struct sockaddr_in *theaddr;
+		if (global::proxyAddr != NULL)
+			theaddr = global::proxyAddr;
+		else
+			theaddr = &stataddr;
+		if (connect(fd, (struct sockaddr*) theaddr, sizeof(struct sockaddr_in))
+				== 0) {
+			// success
+			return writeC;
+		} else if (errno == EINPROGRESS) {
+			// would block
+			return connectingC;
+		} else {
+			// error
+			(void) close(fd);
+			return emptyC;
+		}
+	}
 }
-
 
 ///////////////////////////////////////////////////////////
 // class NamedSite
@@ -79,347 +74,428 @@ static char getFds (Connexion *conn, struct in_addr *addr, uint port) {
 
 /** Constructor : initiate fields used by the program
  */
-NamedSite::NamedSite () {
-  name[0] = 0;
-  nburls = 0;
-  inFifo = 0; outFifo = 0;
-  isInFifo = false;
-  dnsState = waitDns;
-  cname = NULL;
+NamedSite::NamedSite() {
+	name[0] = 0;
+	nburls = 0;
+	inFifo = 0;
+	outFifo = 0;
+	isInFifo = false;
+	dnsState = waitDns;
+	cname = NULL;
 }
 
 /** Destructor : This one is never used
  */
-NamedSite::~NamedSite () {
-  assert(false);
+NamedSite::~NamedSite() {
+	assert(false);
 }
 
 /* Management of the Fifo */
 void NamedSite::putInFifo(url *u) {
-  fifo[inFifo] = u;
-  inFifo = (inFifo + 1) % maxUrlsBySite;
-  assert(inFifo!=outFifo);
+	fifo[inFifo] = u;
+	inFifo = (inFifo + 1) % maxUrlsBySite;
+	assert(inFifo != outFifo);
 }
 
 url *NamedSite::getInFifo() {
-  assert (inFifo != outFifo);
-  url *tmp = fifo[outFifo];
-  outFifo = (outFifo + 1) % maxUrlsBySite;
-  return tmp;
+	assert(inFifo != outFifo);
+	url *tmp = fifo[outFifo];
+	outFifo = (outFifo + 1) % maxUrlsBySite;
+	return tmp;
 }
 
 short NamedSite::fifoLength() {
-  return (inFifo + maxUrlsBySite - outFifo) % maxUrlsBySite;
+	return (inFifo + maxUrlsBySite - outFifo) % maxUrlsBySite;
 }
 
 /* Put an url in the fifo if their are not too many */
 void NamedSite::putGenericUrl(url *u, int limit, bool prio) {
-  if (nburls > maxUrlsBySite-limit) {
-	// Already enough Urls in memory for this Site
-    // first check if it can already be forgotten
-    if (!strcmp(name, u->getHost())) {
-      if (dnsState == errorDns) {
-        nburls++;
-        forgetUrl(u, noDNS);
-        return;
-      }
-      if (dnsState == noConnDns) {
-        nburls++;
-        forgetUrl(u, noConnection);
-        return;
-      }
-      if (u->getPort() == port
-          && dnsState == doneDns && !testRobots(u->getFile())) {
-        nburls++;
-        forgetUrl(u, forbiddenRobots);
-        return;
-      }
-    }
-    // else put it back in URLsDisk
-    refUrl();
-    global::inter->getOne();
-    if (prio) {
-      global::URLsPriorityWait->put(u);
-    } else {
-      global::URLsDiskWait->put(u);
-    }
-  } else {
-    nburls++;
-    if (dnsState == waitDns
-        || strcmp(name, u->getHost())
-        || port != u->getPort()
-        || global::now > dnsTimeout) {
-      // dns not done or other site
-      putInFifo(u);
-      addNamedUrl();
-      // Put Site in fifo if not yet in
-      if (!isInFifo) {
-        isInFifo = true;
-        global::dnsSites->put(this);
-      }
-    } else switch (dnsState) {
-    case doneDns:
-      transfer(u);
-      break;
-    case errorDns:
-      forgetUrl(u, noDNS);
-      break;
-    default: // noConnDns
-      forgetUrl(u, noConnection);
-    }
-  }
+	//char buf[3072];
+	if (nburls > maxUrlsBySite - limit) {
+		// 该站点URL数量已达到限制
+		// Already enough Urls in memory for this Site
+		// first check if it can already be forgotten
+		if (!strcmp(name, u->getHost())) {
+			// 新URL属于同一主机
+			if (dnsState == errorDns) {
+				// DNS错误，忽略之
+				outputDetails(URL_TARGET, u->getUrl(), URL_IGNORED, "域名解析失败");
+				//sprintf(buf, "URL %s 被忽略：域名解析失败[%ld]", u->getUrl(),
+				//		global::now);
+				//syslog(LOG_WARNING, buf);
+				//
+				nburls++;
+				forgetUrl(u, noDNS);
+				return;
+			}
+			if (dnsState == noConnDns) {
+				// 无可用连接，忽略之
+				outputDetails(URL_TARGET, u->getUrl(), URL_IGNORED, "无法创建用于解析域名的套接字");
+				//sprintf(buf, "URL %s 被忽略：无法创建用于解析域名的套接字[%ld]", u->getUrl(),
+				//		global::now);
+				//syslog(LOG_WARNING, buf);
+				//
+				nburls++;
+				forgetUrl(u, noConnection);
+				return;
+			}
+			if (u->getPort() == port && dnsState == doneDns
+					&& !testRobots(u->getFile())) {
+				// 禁止爬此URL，忽略之
+				outputDetails(URL_TARGET, u->getUrl(), URL_IGNORED, "禁止爬虫访问");
+				//sprintf(buf, "URL %s 被忽略：禁止爬虫访问[%ld]", u->getUrl(),
+				//		global::now);
+				//syslog(LOG_WARNING, buf);
+				//
+				nburls++;
+				forgetUrl(u, forbiddenRobots);
+				return;
+			}
+		}
+		// else put it back in URLsDisk
+		refUrl();
+		global::inter->getOne();
+		if (prio) {
+			global::URLsPriorityWait->put(u);
+			outputDetails(URL_TARGET, u->getUrl(), URL_QUEUE, " 已加入优先等待队列");
+			//sprintf(buf, "URL %s 已加入优先等待队列[%ld]", u->getUrl(), global::now);
+		} else {
+			global::URLsDiskWait->put(u);
+			outputDetails(URL_TARGET, u->getUrl(), URL_QUEUE, "已加入非优先等待队列");
+			//sprintf(buf, "URL %s 已加入非优先等待队列[%ld]", u->getUrl(), global::now);
+		}
+		//syslog(LOG_DEBUG, buf);
+	} else {
+		// 该站点URL数量还未达到限制
+		nburls++;
+		if (dnsState == waitDns || strcmp(name, u->getHost())
+				|| port != u->getPort() || global::now > dnsTimeout) {
+			// 域名解析未完成，或属于不同站点
+			// dns not done or other site
+			putInFifo(u);
+			addNamedUrl();
+			// 计数，用于调试
+			// Put Site in fifo if not yet in
+			if (!isInFifo) {
+				isInFifo = true;
+				global::dnsSites->put(this);
+				//
+				outputDetails(URL_TARGET, u->getUrl(), URL_QUEUE, "已加入到命名站点");
+				//sprintf(buf, "URL %s 已加入到命名站点[%ld]", u->getUrl(), global::now);
+				//syslog(LOG_DEBUG, buf);
+			}
+		} else {
+			// 域名已解析且属于同一站点
+			switch (dnsState) {
+			case doneDns:
+				// 域名解析成功
+				transfer(u); // 放入IP站点表，或者忽略(如果被禁止的话)
+				break;
+			case errorDns:
+				outputDetails(URL_TARGET, u->getUrl(), URL_IGNORED, "域名解析失败");
+				//sprintf(buf, "URL %s 被忽略：域名解析失败[%ld]", u->getUrl(),
+				//		global::now);
+				//syslog(LOG_WARNING, buf);
+				//
+				forgetUrl(u, noDNS);
+				break;
+			default: // noConnDns
+				outputDetails(URL_TARGET, u->getUrl(), URL_IGNORED, "无法创建用于解析域名的套接字");
+				//sprintf(buf, "URL %s 被忽略：无法创建用于解析域名的套接字[%ld]", u->getUrl(),
+				//		global::now);
+				//syslog(LOG_WARNING, buf);
+				//
+				forgetUrl(u, noConnection);
+			}
+		}
+	}
 }
 
 /** Init a new dns query
  */
-void NamedSite::newQuery () {
-  // Update our stats
-  newId();
-  if (global::proxyAddr != NULL) {
-    // we use a proxy, no need to get the sockaddr
-    // give anything for going on
-    siteSeen();
-    siteDNS();
-    // Get the robots.txt
-    dnsOK();
-  } else if (isdigit(name[0])) {
-    // the name already in numbers-and-dots notation
-	siteSeen();
-	if (inet_aton(name, &addr)) {
-	  // Yes, it is in numbers-and-dots notation
-	  siteDNS();
-	  // Get the robots.txt
-	  dnsOK();
+void NamedSite::newQuery() {
+	// Update our stats
+	newId();
+	if (global::proxyAddr != NULL) {
+		// we use a proxy, no need to get the sockaddr
+		// give anything for going on
+		siteSeen();
+		siteDNS();
+		// Get the robots.txt
+		dnsOK();
+	} else if (isdigit(name[0])) {
+		// 可能是IP地址
+		// the name already in numbers-and-dots notation
+		siteSeen();
+		// 检查是否是合法的IP地址
+		if (inet_aton(name, &addr)) {
+			// IP地址有效
+			// Yes, it is in numbers-and-dots notation
+			siteDNS();
+			// Get the robots.txt
+			dnsOK();
+		} else {
+			// No, it isn't : this site is a non sense
+			dnsState = errorDns;
+			dnsErr();
+		}
 	} else {
-	  // No, it isn't : this site is a non sense
-      dnsState = errorDns;
-	  dnsErr();
+		// 需要域名解析
+		// submit an adns query
+		outputDetails(DOMAIN_TARGET, name, DOMAIN_SUBMIT, NULL);
+		//char buf[512];
+		//sprintf(buf, "提交域名 %s 解析查询...[%ld]", name, global::now);
+		//syslog(LOG_INFO, buf);
+		//
+		global::nbDnsCalls++;
+		adns_query quer = NULL;
+		adns_submit(global::ads, name, (adns_rrtype) adns_r_addr,
+				(adns_queryflags) 0, this, &quer);
 	}
-  } else {
-    // submit an adns query
-    char buf[512];
-    sprintf(buf, "Submitting adns query of domain \"%s\"...", name);
-    syslog(LOG_INFO, buf);
-    global::nbDnsCalls++;
-    adns_query quer = NULL;
-    adns_submit(global::ads, name,
-                (adns_rrtype) adns_r_addr,
-                (adns_queryflags) 0,
-                this, &quer);
-  }
 }
 
 /** The dns query ended with success
  * assert there is a freeConn
  */
-void NamedSite::dnsAns (adns_answer *ans) {
-  if (ans->status == adns_s_prohibitedcname) {
-    if (cname == NULL) {
-      // try to find ip for cname of cname
-      cname = newString(ans->cname);
-      global::nbDnsCalls++;
-      adns_query quer = NULL;
-      char buf[512];
-      sprintf(buf, "Finding ip for cname \"%s\" of domain \"%s\"...", cname, name);
-      syslog(LOG_INFO, buf);
-      adns_submit(global::ads, cname,
-                  (adns_rrtype) adns_r_addr,
-                  (adns_queryflags) 0,
-                  this, &quer);
-    } else {
-      // dns chains too long => dns error
-      // cf nslookup or host for more information
-      char buf[512];
-      sprintf(buf, "adns query failed(dns chains too long): %s");
-      syslog(LOG_WARNING, buf);
-      siteSeen();
-      delete [] cname; cname = NULL;
-      dnsState = errorDns;
-      dnsErr();
-    }
-  } else {
-    siteSeen();
-    if (cname != NULL) { delete [] cname; cname = NULL; }
-    if (ans->status != adns_s_ok) {
-      // No addr inet
-      char buf[512];
-      sprintf(buf, "adns query failed(no addr inet): %s");
-      syslog(LOG_WARNING, buf);
-      dnsState = errorDns;
-      dnsErr();
-    } else {
-      siteDNS();
-      // compute the new addr
-      memcpy (&addr,
-              &ans->rrs.addr->addr.inet.sin_addr,
-              sizeof (struct in_addr));
-      char buf[512];
-      sprintf(buf, "adns query success: %s --> %s", name, addr);
-      syslog(LOG_INFO, buf);
-      // Get the robots.txt
-      dnsOK();
-    }
-  }
+void NamedSite::dnsAns(adns_answer *ans) {
+	if (ans->status == adns_s_prohibitedcname) {
+		if (cname == NULL) {
+			// try to find ip for cname of cname
+			cname = newString(ans->cname);
+			global::nbDnsCalls++;
+			adns_query quer = NULL;
+			outputDetails(DOMAIN_TARGET, name, DOMAIN_CNAME, cname);
+			//char buf[512];
+			//sprintf(buf, "查询域名 %s 的 cname %s 对应的 IP 地址 ...[%ld]", name,
+			//		cname, global::now);
+			//syslog(LOG_INFO, buf);
+			//
+			adns_submit(global::ads, cname, (adns_rrtype) adns_r_addr,
+					(adns_queryflags) 0, this, &quer);
+		} else {
+			// dns chains too long => dns error
+			// cf nslookup or host for more information
+			outputDetails(DOMAIN_TARGET, name, DOMAIN_ERROR, "DNS链过长");
+			//char buf[512];
+			//sprintf(buf, "域名 %s 解析查询失败: DNS链过长[%ld]", name, global::now);
+			//syslog(LOG_WARNING, buf);
+			//
+			siteSeen();
+			delete[] cname;
+			cname = NULL;
+			dnsState = errorDns;
+			dnsErr();
+		}
+	} else {
+		siteSeen();
+		if (cname != NULL) {
+			delete[] cname;
+			cname = NULL;
+		}
+		if (ans->status != adns_s_ok) {
+			// No addr inet
+			outputDetails(DOMAIN_TARGET, name, DOMAIN_ERROR, "无 IP 地址");
+			//char buf[512];
+			//sprintf(buf, "域名 %s 解析查询失败: 无 IP 地址[%ld]", name, global::now);
+			//syslog(LOG_WARNING, buf);
+			//
+			dnsState = errorDns;
+			dnsErr();
+		} else {
+			siteDNS();
+			// compute the new addr
+			memcpy(&addr, &ans->rrs.addr->addr.inet.sin_addr,
+					sizeof(struct in_addr));
+			outputDetails(DOMAIN_TARGET, name, DOMAIN_OK, inet_ntoa(ans->rrs.addr->addr.inet.sin_addr));
+			//char buf[512];
+			//sprintf(buf, "域名 %s 解析成功: %s[%ld]", name,
+			//		inet_ntoa(ans->rrs.addr->addr.inet.sin_addr), global::now);
+			//syslog(LOG_INFO, buf);
+			//
+			// Get the robots.txt
+			dnsOK();
+		}
+	}
 }
 
 /** we've got a good dns answer
  * get the robots.txt
  * assert there is a freeConn
  */
-void NamedSite::dnsOK () {
-  Connexion *conn = global::freeConns->get();
-  char res = getFds(conn, &addr, port);
-  if (res != emptyC) {
-    conn->timeout = timeoutPage;
-    if (global::proxyAddr != NULL) {
-      // use a proxy
-      conn->request.addString("GET http://");
-      conn->request.addString(name);
-      char tmp[15];
-      sprintf(tmp, ":%u", port);
-      conn->request.addString(tmp);
-      conn->request.addString("/robots.txt HTTP/1.0\r\nHost: ");
-    } else {
-      // direct connection
-      conn->request.addString("GET /robots.txt HTTP/1.0\r\nHost: ");
-    }
-    conn->request.addString(name);
-    conn->request.addString(global::headersRobots);
-    conn->parser = new robots(this, conn);
-    conn->pos = 0;
-    conn->err = success;
-    conn->state = res;
-  } else {
-    // Unable to get a socket
-    global::freeConns->put(conn);
-    dnsState = noConnDns;
-    dnsErr();
-  }
+void NamedSite::dnsOK() {
+	Connexion *conn = global::freeConns->get();
+	char res = getFds(conn, &addr, port);
+	char buf[128];
+	if (res != emptyC) {
+		conn->timeout = timeoutPage;
+		if (global::proxyAddr != NULL) {
+			// use a proxy
+			conn->request.addString("GET http://");
+			conn->request.addString(name);
+			char tmp[15];
+			sprintf(tmp, ":%u", port);
+			conn->request.addString(tmp);
+			conn->request.addString("/robots.txt HTTP/1.0\r\nHost: ");
+		} else {
+			// direct connection
+			conn->request.addString("GET /robots.txt HTTP/1.0\r\nHost: ");
+		}
+		conn->request.addString(name);
+		conn->request.addString(global::headersRobots);
+		conn->parser = new robots(this, conn);
+		conn->pos = 0;
+		conn->err = success;
+		conn->state = res;
+	} else {
+		// Unable to get a socket
+		outputDetails(ROBOTS_TARGET, name, ROBOTS_GETERR, "无法创建套接字");
+		//sprintf(buf, "无法从 %s:%d 获取 robots.txt：无法创建套接字", name, port);
+		//syslog(LOG_WARNING, buf);
+		//
+		global::freeConns->put(conn);
+		dnsState = noConnDns;
+		dnsErr();
+	}
 }
 
 /** Cannot get the inet addr
  * dnsState must have been set properly before the call
  */
-void NamedSite::dnsErr () {
-  FetchError theErr;
-  if (dnsState == errorDns) {
-    theErr = noDNS;
-  } else {
-    theErr = noConnection;
-  }
-  int ss = fifoLength();
-  // scan the queue
-  for (int i=0; i<ss; i++) {
-    url *u = getInFifo();
-    if (!strcmp(name, u->getHost())) {
-      delNamedUrl();
-      forgetUrl(u, theErr);
-    } else { // different name
-      putInFifo(u);
-    }
-  }
-  // where should now lie this site
-  if (inFifo==outFifo) {
-    isInFifo = false;
-  } else {
-    global::dnsSites->put(this);
-  }
+void NamedSite::dnsErr() {
+	FetchError theErr;
+	if (dnsState == errorDns) {
+		theErr = noDNS;
+	} else {
+		theErr = noConnection;
+	}
+	int ss = fifoLength();
+	// scan the queue
+	char buf[3072];
+	for (int i = 0; i < ss; i++) {
+		url *u = getInFifo();
+		if (!strcmp(name, u->getHost())) {
+			outputDetails(URL_TARGET, u->getUrl(), URL_IGNORED, "无法创建用于解析域名的套接字");
+			//sprintf(buf, "URL %s 被忽略：%s", u->getUrl(),
+			//		(dnsState == errorDns ? "域名解析" : "无法创建用于解析域名的套接字"));
+			//syslog(LOG_WARNING, buf);
+			//
+			delNamedUrl();
+			forgetUrl(u, theErr);
+		} else { // different name
+			putInFifo(u);
+		}
+	}
+	// where should now lie this site
+	if (inFifo == outFifo) {
+		isInFifo = false;
+	} else {
+		global::dnsSites->put(this);
+	}
 }
 
 /** test if a file can be fetched thanks to the robots.txt */
 bool NamedSite::testRobots(char *file) {
-  uint pos = forbidden.getLength();
-  for (uint i=0; i<pos; i++) {
-    if (robotsMatch(forbidden[i], file))
-      return false;
-  }
-  return true;
+	uint pos = forbidden.getLength();
+	for (uint i = 0; i < pos; i++) {
+		if (robotsMatch(forbidden[i], file))
+			return false;
+	}
+	return true;
 }
 
 /** Delete the old identity of the site */
-void NamedSite::newId () {
-  // ip expires or new name or just new port
-  // Change the identity of this site
+void NamedSite::newId() {
+	// ip expires or new name or just new port
+	// Change the identity of this site
 #ifndef NDEBUG
-  if (name[0] == 0) {
-    addsite();
-  }
+	if (name[0] == 0) {
+		addsite();
+	}
 #endif // NDEBUG
-  url *u = fifo[outFifo];
-  strcpy(name, u->getHost());
-  port = u->getPort();
-  dnsTimeout = global::now + dnsValidTime;
-  dnsState = waitDns;
+	url *u = fifo[outFifo];
+	strcpy(name, u->getHost());
+	port = u->getPort();
+	dnsTimeout = global::now + dnsValidTime;
+	dnsState = waitDns;
 }
 
 /** we got the robots.txt,
  * compute ipHashCode
  * transfer what must be in IPSites
  */
-void NamedSite::robotsResult (FetchError res) {
-  bool ok = res != noConnection;
-  if (ok) {
-    dnsState = doneDns;
-    // compute ip hashcode
-    if (global::proxyAddr == NULL) {
-      ipHash=0;
-      char *s = (char *) &addr;
-      for (uint i=0; i<sizeof(struct in_addr); i++) {
-        ipHash = ipHash*31 + s[i];
-      }
-    } else {
-      // no ip and need to avoid rapidFire => use hostHashCode
-      ipHash = this - global::namedSiteList;
-    }
-    ipHash %= IPSiteListSize;
-  } else {
-    dnsState = noConnDns;
-  }
-  int ss = fifoLength();
-  // scan the queue
-  for (int i=0; i<ss; i++) {
-    url *u = getInFifo();
-    if (!strcmp(name, u->getHost())) {
-      delNamedUrl();
-      if (ok) {
-        if (port == u->getPort()) {
-          transfer(u);
-        } else {
-          putInFifo(u);
-        }
-      } else {
-        forgetUrl(u, noConnection);
-      }
-    } else {
-      putInFifo(u);
-    }
-  }
-  // where should now lie this site
-  if (inFifo==outFifo) {
-    isInFifo = false;
-  } else {
-    global::dnsSites->put(this);
-  }  
+void NamedSite::robotsResult(FetchError res) {
+	bool ok = res != noConnection;
+	if (ok) {
+		dnsState = doneDns;
+		// compute ip hashcode
+		if (global::proxyAddr == NULL) {
+			ipHash = 0;
+			char *s = (char *) &addr;
+			for (uint i = 0; i < sizeof(struct in_addr); i++) {
+				ipHash = ipHash * 31 + s[i];
+			}
+		} else {
+			// no ip and need to avoid rapidFire => use hostHashCode
+			ipHash = this - global::namedSiteList;
+		}
+		ipHash %= IPSiteListSize;
+	} else {
+		dnsState = noConnDns;
+	}
+	int ss = fifoLength();
+	// scan the queue
+	for (int i = 0; i < ss; i++) {
+		url *u = getInFifo();
+		if (!strcmp(name, u->getHost())) {
+			delNamedUrl();
+			if (ok) {
+				if (port == u->getPort()) {
+					transfer(u);
+				} else {
+					putInFifo(u);
+				}
+			} else {
+				forgetUrl(u, noConnection);
+			}
+		} else {
+			putInFifo(u);
+		}
+	}
+	// where should now lie this site
+	if (inFifo == outFifo) {
+		isInFifo = false;
+	} else {
+		global::dnsSites->put(this);
+	}
 }
 
-void NamedSite::transfer (url *u) {
-  if (testRobots(u->getFile())) {
-    if (global::proxyAddr == NULL) {
-      memcpy (&u->addr, &addr, sizeof (struct in_addr));
-    }
-    global::IPSiteList[ipHash].putUrl(u);
-  } else {
-    forgetUrl(u, forbiddenRobots);
-  }
+void NamedSite::transfer(url *u) {
+	char buf[3072];
+	if (testRobots(u->getFile())) {
+		if (global::proxyAddr == NULL) {
+			memcpy(&u->addr, &addr, sizeof(struct in_addr));
+		}
+		global::IPSiteList[ipHash].putUrl(u);
+		//
+		outputDetails(URL_TARGET, u->getUrl(), URL_QUEUE, "已加入到 IP 站点表");
+		//sprintf(buf, "URL %s 已加入到 IP 站点表[%ld]", u->getUrl(), global::now);
+		//syslog(LOG_DEBUG, buf);
+	} else {
+		outputDetails(URL_TARGET, u->getUrl(), URL_IGNORED, "禁止爬虫访问");
+		//sprintf(buf, "URL %s 被忽略：禁止爬虫访问[%ld]", u->getUrl(), global::now);
+		//syslog(LOG_WARNING, buf);
+		//
+		forgetUrl(u, forbiddenRobots);
+	}
 }
 
-void NamedSite::forgetUrl (url *u, FetchError reason) {
-  urls();
-  fetchFail(u, reason);
-  answers(reason);
-  nburls--;
-  delete u;
-  global::inter->getOne();
+void NamedSite::forgetUrl(url *u, FetchError reason) {
+	urls();
+	fetchFail(u, reason);
+	answers(reason);
+	nburls--;
+	delete u;
+	global::inter->getOne();
 }
 
 ///////////////////////////////////////////////////////////
@@ -428,54 +504,55 @@ void NamedSite::forgetUrl (url *u, FetchError reason) {
 
 /** Constructor : initiate fields used by the program
  */
-IPSite::IPSite () {
-  lastAccess = 0;
-  isInFifo = false;
+IPSite::IPSite() {
+	lastAccess = 0;
+	isInFifo = false;
 }
 
 /** Destructor : This one is never used
  */
-IPSite::~IPSite () {
-  assert(false);
+IPSite::~IPSite() {
+	assert(false);
 }
 
 /** Put an prioritarian url in the fifo
  * Up to now, it's very naive
  * because we have no memory of priority inside the url
  */
-void IPSite::putUrl (url *u) {
-  // All right, put this url inside at the end of the queue
-  tab.put(u);
-  addIPUrl();
-  // Put Site in fifo if not yet in
-  if (!isInFifo) {
+void IPSite::putUrl(url *u) {
+	// All right, put this url inside at the end of the queue
+	tab.put(u);
+	addIPUrl();
+	// Put Site in fifo if not yet in
+	if (!isInFifo) {
 #ifndef NDEBUG
-    if (lastAccess == 0) addipsite();
+		if (lastAccess == 0)
+			addipsite();
 #endif // NDEBUG
-    isInFifo = true;
-    if (lastAccess + global::waitDuration <= global::now
-        && global::freeConns->isNonEmpty()) {
-      fetch();
-    } else {
-      global::okSites->put(this);
-    }
-  }
+		isInFifo = true;
+		if (lastAccess + global::waitDuration <= global::now
+				&& global::freeConns->isNonEmpty()) {
+			fetch();
+		} else {
+			global::okSites->put(this);
+		}
+	}
 }
 
 /** Get an url from the fifo and do some stats
  */
-inline url *IPSite::getUrl () {
-  url *u = tab.get();
-  delIPUrl();
-  urls();
-  global::namedSiteList[u->hostHashCode()].nburls--;
-  global::inter->getOne();
+inline url *IPSite::getUrl() {
+	url *u = tab.get();
+	delIPUrl();
+	urls();
+	global::namedSiteList[u->hostHashCode()].nburls--;
+	global::inter->getOne();
 #if defined(SPECIFICSEARCH) && !defined(NOSTATS)
-  if (privilegedExts[0] != NULL && matchPrivExt(u->getFile())) {
-    extensionTreated();
-  }
+	if (privilegedExts[0] != NULL && matchPrivExt(u->getFile())) {
+		extensionTreated();
+	}
 #endif
-  return u;
+	return u;
 }
 
 /** fetch the first page in the fifo okSites
@@ -484,60 +561,75 @@ inline url *IPSite::getUrl () {
  * This function always put the IPSite in fifo before returning
  *   (or set isInFifo to false if empty)
  */
-int IPSite::fetch () {
-  if (tab.isEmpty()) {
-	// no more url to read
-	// This is possible because this function can be called recursively
-	isInFifo = false;
-    return 0;
-  } else {
-    int next_call = lastAccess + global::waitDuration;
-    if (next_call > global::now) {
-      global::okSites->rePut(this);
-      return next_call;
-    } else {
-      Connexion *conn = global::freeConns->get();
-      url *u = getUrl();
-      // We're allowed to fetch this one
-      // open the socket and write the request
-      char res = getFds(conn, &(u->addr), u->getPort());
-      if (res != emptyC) {
-        lastAccess = global::now;
-        conn->timeout = timeoutPage;
-        conn->request.addString("GET ");
-        if (global::proxyAddr != NULL) {
-          char *tmp = u->getUrl();
-          conn->request.addString(tmp);
-        } else {
-          conn->request.addString(u->getFile());
-        }
-        conn->request.addString(" HTTP/1.0\r\nHost: ");
-        conn->request.addString(u->getHost());
+int IPSite::fetch() {
+	if (tab.isEmpty()) {
+		// no more url to read
+		// This is possible because this function can be called recursively
+		isInFifo = false;
+		return 0;
+	} else {
+		int next_call = lastAccess + global::waitDuration;
+		if (next_call > global::now) {
+			global::okSites->rePut(this);
+			return next_call;
+		} else {
+			Connexion *conn = global::freeConns->get();
+			url *u = getUrl();
+			// We're allowed to fetch this one
+			// open the socket and write the request
+			//char ipPortInfo[32];
+			//sprintf(ipPortInfo, "%s:%d",
+			//		inet_ntoa(*(struct in_addr *) &u->addr.s_addr),
+			//		u->getPort());
+			//
+			outputDetails(URL_TARGET, u->getUrl(), URL_GETTING, "开始连接");
+			//char buf[64];
+			//sprintf(buf, "连接服务器 %s...[%ld]", ipPortInfo, global::now);
+			//syslog(LOG_INFO, buf);
+			//
+			char res = getFds(conn, &(u->addr), u->getPort());
+			if (res != emptyC) {
+				lastAccess = global::now;
+				conn->timeout = timeoutPage;
+				conn->request.addString("GET ");
+				if (global::proxyAddr != NULL) {
+					char *tmp = u->getUrl();
+					conn->request.addString(tmp);
+				} else {
+					conn->request.addString(u->getFile());
+				}
+				conn->request.addString(" HTTP/1.0\r\nHost: ");
+				conn->request.addString(u->getHost());
 #ifdef COOKIES
-        if (u->cookie != NULL) {
-          conn->request.addString("\r\nCookie: ");
-          conn->request.addString(u->cookie);
-        }
+				if (u->cookie != NULL) {
+					conn->request.addString("\r\nCookie: ");
+					conn->request.addString(u->cookie);
+				}
 #endif // COOKIES
-        conn->request.addString(global::headers);
-        conn->parser = new html (u, conn);
-        conn->pos = 0;
-        conn->err = success;
-        conn->state = res;
-        if (tab.isEmpty()) {
-          isInFifo = false;
-        } else {
-          global::okSites->put(this);
-        }
-        return 0;
-      } else {
-        // Unable to connect
-        fetchFail(u, noConnection);
-        answers(noConnection);
-        delete u;
-        global::freeConns->put(conn);
-        return fetch();
-      }    
-    }
-  }
+				conn->request.addString(global::headers);
+				conn->parser = new html(u, conn);
+				conn->pos = 0;
+				conn->err = success;
+				conn->state = res;
+				if (tab.isEmpty()) {
+					isInFifo = false;
+				} else {
+					global::okSites->put(this);
+				}
+				return 0;
+			} else {
+				// Unable to connect
+				outputDetails(URL_TARGET, u->getUrl(), URL_GETERR, "连接失败");
+				//sprintf(buf, "无法连接服务器 %s[%ld]", ipPortInfo,
+				//		global::now);
+				//syslog(LOG_WARNING, buf);
+				//
+				fetchFail(u, noConnection);
+				answers(noConnection);
+				delete u;
+				global::freeConns->put(conn);
+				return fetch();
+			}
+		}
+	}
 }

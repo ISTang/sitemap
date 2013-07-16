@@ -54,7 +54,7 @@ void loaded (html *page) {
     indexFds = creat(fileName, S_IRWXU);
     if (indexFds < 0) {
       char buf[1024];
-      sprintf(buf, "cannot open file %s", fileName);
+      sprintf(buf, "无法打开文件 %s", fileName);
       syslog(LOG_ERR, buf);
       exit(1);
     }
@@ -65,7 +65,7 @@ void loaded (html *page) {
   int fd = creat(fileName, S_IRWXU);
   if (fd < 0) {
       char buf[1024];
-      sprintf(buf, "cannot open file %s", fileName);
+      sprintf(buf, "无法打开文件 %s", fileName);
       syslog(LOG_ERR, buf);
   }
   int s=0;
@@ -108,4 +108,8 @@ void initUserOutput () {
  */
 void outputStats(int fds, const char *queryParams) {
   ecrire(fds, "Nothing to declare");
+}
+
+void outputDetails(TargetType type, const char *target, TargetAction action,
+		const char *desc) {
 }

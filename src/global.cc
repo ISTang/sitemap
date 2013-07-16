@@ -214,7 +214,6 @@ global::~global () {
 void global::parseFile (char *file) {
   int fds = open(file, O_RDONLY);
   if (fds < 0) {
-	syslog(LOG_ERR, "无法打开配置文件");
 	exit(1);
   }
   char *tmp = readfile(fds);
@@ -241,7 +240,7 @@ void global::parseFile (char *file) {
       if (u->isValid()) {
         check(NULL, u);
       } else {
-        syslog(LOG_ERR, "起始 url 无效");
+        syslog(LOG_ERR, "起始 url无效");
         exit(1);
       }
 	} else if (!strcasecmp(tok, "waitduration")) {

@@ -18,7 +18,7 @@ void startThread (StartFun run, void *arg) {
       || pthread_create(&t, &attr, run, arg) != 0
       || pthread_attr_destroy(&attr) != 0
       || pthread_detach(t) != 0) {
-    syslog(LOG_ERR, "Unable to launch a thread");
+    syslog(LOG_ERR, "无法启动新的线程");
     exit(1);
   }
 }

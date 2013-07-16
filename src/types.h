@@ -114,4 +114,32 @@ enum TagType
 // standard types
 typedef	unsigned int uint;
 
+
+enum TargetType {
+	DOMAIN_TARGET/*域名*/,
+	ROBOTS_TARGET/*robots.txt*/,
+	URL_TARGET/*网址*/,
+};
+
+enum TargetAction {
+	DOMAIN_SUBMIT/*提交域名解析查询*/,
+	DOMAIN_CNAME/*根据 CNAME 查 IP 地址*/,
+	DOMAIN_OK/*域名解析成功*/,
+	DOMAIN_ERROR/*域名解析失败*/,
+	//
+	ROBOTS_GETTING/*正下载 robots.txt*/,
+	ROBOTS_GETERR/*robots.txt 下载失败*/,
+	ROBOTS_GETOK/*已下载 robots.txt*/,
+	ROBOTS_PARSEOK/*已成功解析 robots.txt*/,
+	ROBOTS_PARSEERR/*robots.txt 解析失败*/,
+	//
+	URL_IGNORED/*URL 被忽略*/,
+	URL_QUEUE/*URL 加入队列*/,
+	URL_GETTING/*正下载页面*/,
+	URL_GETERR/*页面下载失败*/,
+	URL_GETOK/*已下载页面*/,
+	URL_PARSEOK/*已成功解析页面*/,
+	URL_PARSEERR/*页面解析失败*/,
+};
+
 #endif // TYPES_H

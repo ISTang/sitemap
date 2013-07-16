@@ -68,9 +68,10 @@ int main (int argc, char *argv[]) {
 
   if (global::daemonize) {
     daemonize();
-    syslog(LOG_INFO, "Sitemap 已经启动。");
-  } else {
-    printf("Sitemap 已经启动。");
+
+    char buf[64];
+    sprintf(buf, "Sitemap 已经启动...[%ld]", global::now);
+    syslog(LOG_INFO, buf);
   }
 
 #ifdef PROF

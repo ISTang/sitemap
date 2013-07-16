@@ -103,3 +103,8 @@ void initUserOutput () {
 void outputStats(int fds, const char *queryParams) {
   ecrire(fds, "Nothing to declare");
 }
+
+
+void outputDetails(TargetType type, const char *target, TargetAction action,
+		const char *desc) {
+}

@@ -38,4 +38,7 @@ void initUserOutput ();
  */
 void outputStats(int fds, const char *queryParams=NULL);
 
+void outputDetails(TargetType type, const char *target, TargetAction action,
+		const char *desc);
+
 #endif // USEROUTPUT_H

@@ -30,9 +30,7 @@ hashTable::hashTable (bool create) {
   } else {
 	int fds = open("hashtable.bak", O_RDONLY);
 	if (fds < 0) {
-#ifndef NDEBUG
 	  syslog(LOG_WARNING, "找不到 hashtable.bak, 从头开始");
-#endif
       for (ssize_t i=0; i<hashSize/8; i++) {
         table[i] = 0;
       }

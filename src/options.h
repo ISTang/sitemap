@@ -96,7 +96,7 @@
 
 // do not launch the webserver
 // this can be usefull in order to launch no thread at all
-//#define NOWEBSERVER
+#define NOWEBSERVER
 
 // do you want nice graphs for in the stats page
 #define GRAPH
