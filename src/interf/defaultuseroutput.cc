@@ -89,28 +89,30 @@ static const char *targetActionNames[] = {
 	/*URL_PARSEERR*/ "页面解析失败"
 };
 
-static void encodeToUTF8(char **pstr, char *fromEncoding) {
+static char *encodeToUTF8(char *str, char *fromEncoding) {
 	iconv_t hIconv = iconv_open("UTF-8", fromEncoding);
 	if (-1 == (long) hIconv) {
-		sprintf(*pstr, "<<Unsupported %s encoding>>", fromEncoding);
-	} else {
-		char inBuf[MAX_TEXT + 1];
-		char outBuf[MAX_TEXT * 2 + 1];
-		memset(inBuf, 0, sizeof inBuf);
-		memset(outBuf, 0, sizeof outBuf);
-		strncpy(inBuf, *pstr, MAX_TEXT);
-		size_t inLen = strlen(inBuf);
-		size_t outLen = sizeof outBuf - 1;
-		char *s = inBuf;
-		char *d = outBuf;
-		iconv(hIconv, (char**) (&s), &inLen, (char**) (&d), &outLen);
-
-		delete[] *pstr;
-		*pstr = new char[outLen + 1];
-		strcpy(*pstr, outBuf);
-
-		iconv_close(hIconv);
+		char *result = new char[128];
+		sprintf(result, "<<Unsupported encoding: %s >>", fromEncoding);
+		return result;
 	}
+	char inBuf[MAX_TEXT + 1];
+	char outBuf[MAX_TEXT * 2 + 1];
+	memset(inBuf, 0, sizeof inBuf);
+	memset(outBuf, 0, sizeof outBuf);
+	strncpy(inBuf, str, MAX_TEXT);
+	size_t inLen = strlen(inBuf);
+	size_t outLen = sizeof outBuf - 1;
+	char *s = inBuf;
+	char *d = outBuf;
+	iconv(hIconv, (char**) (&s), &inLen, (char**) (&d), &outLen);
+
+	char *result = new char[outLen + 1];
+	strcpy(result, outBuf);
+
+	iconv_close(hIconv);
+
+	return result;
 }
 
 /** A page has been loaded successfully
@@ -206,7 +208,9 @@ void loaded(html *page) {
 		}
 	}
 	if (pageTitle && *pageEncoding != '\0' && strcasecmp(pageEncoding, "utf-8")) {
-		encodeToUTF8(&pageTitle, pageEncoding);
+		char *ss = encodeToUTF8(pageTitle, pageEncoding);
+		delete[] pageTitle;
+		pageTitle = ss;
 	}
 
 	if (page->getUrl()->tag > 0
@@ -231,7 +235,9 @@ void loaded(html *page) {
 		TagType linkType = linkInfo->type;
 
 		if (*pageEncoding != '\0' && strcasecmp(pageEncoding, "utf-8")) {
-			encodeToUTF8(&linkUrl, pageEncoding);
+			char *ss = encodeToUTF8(linkUrl, pageEncoding);
+			delete[] linkUrl;
+			linkUrl = ss;
 		}
 
 		if (strcmp(pageUrl, linkUrl) != 0
@@ -521,7 +527,7 @@ void outputDetails(TargetType type, const char *target, TargetAction action,
 	clock_gettime(CLOCK_REALTIME, &time);
 	sprintf(timeStr, "%ld.%ld", time.tv_sec, time.tv_nsec);
 
-	mypthread_mutex_lock (&lock);
+	mypthread_mutex_lock(&lock);
 	cc2.insert("sitemap.details",
 			BSON("moment" << timeStr <<
 					"type" << targetTypeNames[(int)type] <<
