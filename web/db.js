@@ -279,13 +279,13 @@ function openDatabase(callback) {
 
 function getChildSites(siteName, homepageUrl, urlSet, hostSet, childSites, callback) {
 
-    log("正在分析站点 " + siteName + " 中的所有子站点...");
+    log("获取站点 " + siteName + " 中的子站点...");
     var siteTag;
     async.series([
         function (callback) {
-            // 获取站点标记
             db.collection("site", {safe: false}, function (err, collection) {
                 if (err) return callback(err);
+                log("获取站点标记...");
                 collection.findOne({url: homepageUrl}, function (err, site) {
                     if (err) return callback(err);
                     if (site == null) return callback("站点 " + siteName + " 不存在！")
@@ -297,6 +297,7 @@ function getChildSites(siteName, homepageUrl, urlSet, hostSet, childSites, callb
         function (callback) {
             redisPool.acquire(function (err, redis) {
                 if (err) return callback(err);
+                log("正在分析站点 " + siteName + " 中的所有页面...");
                 redis.smembers("site:" + siteTag + ":links_page", function (err, pageUrls) {
                     redisPool.release(redis);
                     if (err) return callback(err);
@@ -305,7 +306,7 @@ function getChildSites(siteName, homepageUrl, urlSet, hostSet, childSites, callb
                         var hostName = url.parse(pageUrl).hostname;
                         if (hostSet.contains(hostName)) return callback();
                         if (!new RegExp('.*' + siteName + '$').test(hostName)) return callback();
-                        log("扫描到新的主机: " + hostName);
+                        log("扫描到新的站点: " + hostName);
                         hostSet.add(hostName);
                         var o = {id: siteName + "_child_" + nextChildSiteId++, name: hostName, children: []};
                         childSites.push(o);
