@@ -336,15 +336,18 @@ function getChildSites(siteName, homepageUrl, urlSet, hostSet, childSites, callb
                             },
                             function (callback) {
 
-                                log("获取站点 " + siteName + " 中的第 "+(nextPageScore)+"至 "+(nextPageScore+MAX_PAGES-1)+" 个页面...");
+                                log("获取站点 " + siteName + " 中的第 "+(nextPageScore)+" 至 "+(nextPageScore+MAX_PAGES-1)+" 个页面...");
 
                                 redis.zrangebyscore("site:" + siteTag + ":links_page", nextPageScore, nextPageScore+MAX_PAGES-1, function (err, pageUrls) {
 
                                     if (err) return callback(err);
 
+                                    nextPageScore += MAX_PAGES;
+
                                     async.forEachSeries(pageUrls, function (pageUrl, callback) {
 
                                         var hostName = url.parse(pageUrl).hostname;
+                                        if (hostName.indexOf("www.") == 0) hostName = hostName.substring(4); // remove www. prefix
 
                                         if (hostSet.contains(hostName)) return callback();
 
@@ -355,7 +358,6 @@ function getChildSites(siteName, homepageUrl, urlSet, hostSet, childSites, callb
                                         var o = {id: siteName + "_child_" + nextChildSiteId++, name: hostName, children: []};
                                         childSites.push(o);
 
-                                        nextPageScore += MAX_PAGES;
                                         callback();
                                     }, function (err) {
 
