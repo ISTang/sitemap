@@ -311,39 +311,68 @@ function getChildSites(siteName, homepageUrl, urlSet, hostSet, childSites, callb
 
                 if (err) return callback(err);
 
-                log("获取站点 " + siteName + " 中的所有页面...");
+                var pageCount;
+                async.series([
+                    function (callback) {
 
-                redis.smembers("site:" + siteTag + ":links_page", function (err, pageUrls) {
+                        log("获取站点 " + siteName + " 的页面数量...");
+                        redis.zcard("site:" + siteTag + ":links_page", function (err, count) {
+
+                            if (err) return callback(err);
+
+                            pageCount = count;
+                            log("站点 " + siteName + " 总共有 "+pageCount+" 个页面");
+                            callback();
+                        });
+                    },
+                    function (callback) {
+
+                        var nextPageScore = 1;
+                        const MAX_PAGES = 1024;
+                        var nextChildSiteId = 0;
+                        async.whilst(
+                            function () {
+                                return (nextPageScore<=pageCount);
+                            },
+                            function (callback) {
+
+                                log("获取站点 " + siteName + " 中的第 "+(nextPageScore)+"至 "+(nextPageScore+MAX_PAGES-1)+" 个页面...");
+
+                                redis.zrangebyscore("site:" + siteTag + ":links_page", nextPageScore, nextPageScore+MAX_PAGES-1, function (err, pageUrls) {
+
+                                    if (err) return callback(err);
+
+                                    async.forEachSeries(pageUrls, function (pageUrl, callback) {
+
+                                        var hostName = url.parse(pageUrl).hostname;
+
+                                        if (hostSet.contains(hostName)) return callback();
+
+                                        if (!new RegExp('.*' + siteName + '$').test(hostName)) return callback();
+                                        log("扫描到新的站点: " + hostName);
+                                        hostSet.add(hostName);
+
+                                        var o = {id: siteName + "_child_" + nextChildSiteId++, name: hostName, children: []};
+                                        childSites.push(o);
+
+                                        nextPageScore += MAX_PAGES;
+                                        callback();
+                                    }, function (err) {
+
+                                        callback(err);
+                                    });
+                                });
+                            },
+                            function (err) {
+
+                                callback(err);
+                            }
+                        );
+                    }
+                ], function (err) {
 
                     redisPool.release(redis);
-
-                    if (err) return callback(err);
-
-                    log("站点 " + siteName + " 共有 "+pageUrls.length+" 个页面");
-
-                    var nextChildSiteId = 0;
-
-                    var pageCounter = 1;
-                    async.forEachSeries(pageUrls, function (pageUrl, callback) {
-
-                        log("分析页面 "+pageUrl+"..."+(pageCounter*100.0/pageUrls.length).format("0.0")+"%");
-
-                        var hostName = url.parse(pageUrl).hostname;
-
-                        if (hostSet.contains(hostName)) return callback();
-
-                        if (!new RegExp('.*' + siteName + '$').test(hostName)) return callback();
-                        log("扫描到新的站点: " + hostName);
-                        hostSet.add(hostName);
-
-                        var o = {id: siteName + "_child_" + nextChildSiteId++, name: hostName, children: []};
-                        childSites.push(o);
-
-                        callback();
-                    }, function (err) {
-
-                        callback(err);
-                    });
+                    callback(err);
                 });
             });
         }],

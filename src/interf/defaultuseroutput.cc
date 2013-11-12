@@ -249,8 +249,13 @@ void loaded(html *page) {
 				if (page->getUrl()->tag > 0) {
 					//b4.append(linkUrl);
 					redisReply *reply = (redisReply *) redisCommand(c,
-							"sadd site:%d:links_res [%s]%s", page->getUrl()->tag,
-							linkTypes[linkType], linkUrl);
+							"zcard site:%d:links_res", page->getUrl()->tag);
+					int resCount = reply->integer;
+					freeReplyObject(reply);
+					
+					reply = (redisReply *) redisCommand(c,
+							"zadd site:%d:links_res %d [%s]%s", page->getUrl()->tag,
+							++resCount, linkTypes[linkType], linkUrl);
 					freeReplyObject(reply);
 				}
 				b2.append(
@@ -262,8 +267,13 @@ void loaded(html *page) {
 				if (page->getUrl()->tag > 0) {
 					//b5.append(linkUrl);
 					redisReply *reply = (redisReply *) redisCommand(c,
-							"sadd site:%d:links_page %s", page->getUrl()->tag,
-							linkUrl);
+							"zcard site:%d:links_page", page->getUrl()->tag);
+					int pageCount = reply->integer;
+					freeReplyObject(reply);
+
+					reply = (redisReply *) redisCommand(c,
+							"zadd site:%d:links_page %d %s", page->getUrl()->tag,
+							++pageCount, linkUrl);
 					freeReplyObject(reply);
 				}
 				b3.append(
