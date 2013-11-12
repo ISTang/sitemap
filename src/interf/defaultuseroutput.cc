@@ -225,6 +225,16 @@ void loaded(html *page) {
 	b.append("url", pageUrl);
 	b.append("title", (pageTitle == NULL ? "" : pageTitle));
 
+	redisReply *reply = (redisReply *) redisCommand(c,
+			"zcard site:%d:links_res", page->getUrl()->tag);
+	int resCount = reply->integer;
+	freeReplyObject(reply);
+	
+	reply = (redisReply *) redisCommand(c,
+			"zcard site:%d:links_page", page->getUrl()->tag);
+	int pageCount = reply->integer;
+	freeReplyObject(reply);
+
 	mongo::BSONArrayBuilder b2, b3/*, b4, b5*/;
 	Vector<LinkInfo> *links = page->getLinks();
 	std::set < std::string > appendedlinkUrls;
@@ -248,10 +258,6 @@ void loaded(html *page) {
 
 				if (page->getUrl()->tag > 0) {
 					//b4.append(linkUrl);
-					redisReply *reply = (redisReply *) redisCommand(c,
-							"zcard site:%d:links_res", page->getUrl()->tag);
-					int resCount = reply->integer;
-					freeReplyObject(reply);
 					
 					reply = (redisReply *) redisCommand(c,
 							"zadd site:%d:links_res %d [%s]%s", page->getUrl()->tag,
@@ -266,11 +272,6 @@ void loaded(html *page) {
 
 				if (page->getUrl()->tag > 0) {
 					//b5.append(linkUrl);
-					redisReply *reply = (redisReply *) redisCommand(c,
-							"zcard site:%d:links_page", page->getUrl()->tag);
-					int pageCount = reply->integer;
-					freeReplyObject(reply);
-
 					reply = (redisReply *) redisCommand(c,
 							"zadd site:%d:links_page %d %s", page->getUrl()->tag,
 							++pageCount, linkUrl);
