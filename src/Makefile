@@ -19,14 +19,14 @@ sitemap: $(ABS-UTILS-OBJ) $(ABS-FETCH-OBJ) $(ABS-INTERF-OBJ) $(ABS-MAIN-OBJ)
 	$(CXX) $(MF) $(LIBS) \
         -o sitemap $(ABS-UTILS-OBJ) \
 	$(ABS-FETCH-OBJ) $(ABS-INTERF-OBJ) $(ABS-MAIN-OBJ) \
-		/usr/lib/i386-linux-gnu/xen/librt.a \
+        /usr/lib/x86_64-linux-gnu/librt.a \
         ../adns/libadns.a \
         /usr/local/lib/libhiredis.a \
         /usr/lib/libmongoclient.a \
-        /usr/lib/libboost_thread.a \
-        /usr/lib/libboost_filesystem.a \
-        /usr/lib/libboost_program_options.a \
-        /usr/lib/libboost_system.a
+        /usr/local/lib/libboost_thread.a \
+        /usr/local/lib/libboost_filesystem.a \
+        /usr/local/lib/libboost_program_options.a \
+        /usr/local/lib/libboost_system.a
 
 dep-here:
 	makedepend -f- -I$(BASEDIR) -Y *.cc 2> /dev/null > .depend

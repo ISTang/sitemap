@@ -7,9 +7,13 @@
 // 引入依赖包
 var fs = require('fs');
 var async = require('async');
+var _redis = require("redis");
 var mongo = require('mongodb');
+var BSON = mongo.BSONPure;
 var hashes = require('hashes');
 var url = require('url');
+//
+var poolModule = require('generic-pool');
 //
 var config = require(__dirname + '/config');
 var utils = require(__dirname + '/utils');
@@ -19,19 +23,24 @@ exports.getAllSites = getAllSites;
 exports.getPages = getPages;
 //exports.getResources = getResources;
 exports.countSite = countSite;
-exports.countSite2 = countSite2;
+
+const REDIS_SERVER = config.REDIS_SERVER;
+const REDIS_PORT = config.REDIS_PORT;
 
 const MONGO_SERVER = config.MONGO_SERVER;
 const MONGO_PORT = config.MONGO_PORT;
 //
 const LOG_ENABLED = config.LOG_ENABLED;
 
-var logStream = LOG_ENABLED ? fs.createWriteStream("logs/db.log", {"flags": "a"}) : null;
+var logStream = fs.createWriteStream("logs/db.log", {"flags": "a"});
 
+var redisPool;
 var db;
 
 String.prototype.contains = utils.contains;
 Date.prototype.Format = utils.DateFormat;
+
+var nextUnknownSiteId = 0;
 
 /*
  * Print log
@@ -42,131 +51,275 @@ function log(msg) {
     var strDatetime = now.Format("yyyy-MM-dd HH:mm:ss");
     var buffer = "[" + strDatetime + "] " + msg + "[db]";
     if (logStream != null) logStream.write(buffer + "\r\n");
-    console.log(buffer);
+    if (LOG_ENABLED) console.log(buffer);
 }
 
 /**
  * 获取页面信息
- * @param pageUrl
+ * @param parentId
  * @param handleResult
  */
-function getPages(pageUrl,handleResult) {
-  handleResult("Not implemented!");
+function getPages(parentId, handleResult) {
+    var pageUrl = null;
+    var pages = [];
+    async.series([
+        function(callback) {
+            db.collection("page", {safe:false}, function(err, collection){
+                if (err) return callback(err);
+                log("Finding page with id "+parentId+"...");
+                collection.findOne({_id:new BSON.ObjectID(parentId)}, function (err, page) {
+                    if (err) return callback(err);
+                    if (page!=null) {
+                        log("Found "+page.url+"("+page.title+").");
+                        makeSiteTable(page.url, page.links_page, function(err, siteTable){
+                            if (err) return callback(err);
+                            for (var i in siteTable) {
+                                pages.push({id:siteTable[i].key,name:siteTable[i].value,children:[]});
+                            }
+                            callback();
+                        });
+                    } else {
+                        callback();
+                    }
+                });
+            });            
+        }],
+        function(err) {
+            handleResult(err, pages);
+        });
+
+    function makeSiteTable(parentUrl, pageInfos, callback) {
+        var parentName = url.parse(parentUrl).hostname;
+	var hashTable = new hashes.HashTable();
+        var hashSet = new hashes.HashSet();
+        async.forEachSeries(pageInfos, function(pageInfo, callback){
+            var siteName = url.parse(pageInfo.url).hostname;
+            if (parentName==siteName || hashSet.contains(siteName)) return callback();
+            db.collection("page", {safe:false}, function(err, collection){
+                if (err) return callback(err);
+                collection.findOne({url:pageInfo.url}, function (err, page) {
+                    if (err) return callback(err);
+                    if (page) {
+                        db.collection("site", {safe:false}, function(err, collection2){
+                            if (err) return callback(err);
+                            collection2.findOne({url:new RegExp(siteName)}, function (err, site) {
+                                if (err) return callback(err);
+                                if (site) return callback();
+                                hashTable.add(page._id, siteName+"["+page.title+"]");
+                                hashSet.add(siteName);
+                                callback();
+                            });
+                        });
+                    } else {
+                    	callback();
+                    }
+                });
+            });
+        },
+        function(err) {
+            callback(err, hashTable.getKeyValuePairs());
+        });
+    }
 }
 
 /**
  * 获取所有站点信息
- * @param handleResult
  */
 function getAllSites(handleResult) {
+
+    log("查找所有站点...");
+
     var root = {id:"root",name:"根", children:[]};
     db.collection("site", {safe:false}, function(err, collection){
-        if (err) return handleResult(err);
-        collection.find().toArray(function (err, sites) {
-            if (err) return handleResult(err);
-            for (var siteIndex in sites) {
 
-                var site = sites[siteIndex];
+        if (err) return handleResult(err);
+
+        collection.find().toArray(function (err, sites) {
+
+            if (err) return handleResult(err);
+
+            log("共找到 "+sites.length+" 个站点");
+
+            async.forEachSeries(sites, function(site, callback) {
 
                 var siteName = url.parse(site.url).hostname;
-                var site = {id:site.url,name:siteName,children:[]};
-                root.children.push(site);
-                //
-                //log("Found site: "+siteUrl);
-            }
-            handleResult(null, root);
+                if (siteName.indexOf("www.")==0) siteName = siteName.substring(4); // remove www. prefix
+
+                db.collection("page", {safe:false}, function(err, collection){
+
+                    if (err) return callback(err);
+
+                    log("找到站点 "+siteName+"，获取其首页信息...");
+                    collection.findOne({url:site.url}, function (err, homepage) {
+
+                        if (err) return callback(err);
+
+                        if (!homepage) {
+
+                            log("无站点 "+siteName+" 的首页信息");
+
+                            var o = {id:site._id,name:siteName+"[无首页信息]",children:[]};
+                            root.children.push(o);
+
+                            return callback();
+                        }
+
+                        var homepageId = homepage._id;
+                        var homepageTitle = homepage.title;
+
+                        log("站点 "+siteName+" 的首页信息找到：标题为\""+homepageTitle+"\"，共 "+homepage.links_res.length+" 个资源，"+homepage.links_page.length+" 个子页面");
+
+                        var childSites = [];
+                        var urlSet = new hashes.HashSet();
+                        var hostSet = new hashes.HashSet();
+                        urlSet.add(site.url);
+                        hostSet.add(siteName);
+
+                        async.forEachSeries(homepage.links_page, function (childPage, callback) {
+
+                            log("分析子页面 "+childPage.url+"...");
+
+                            scanChildPages(siteName, childPage.url, urlSet, hostSet, childSites, function(err) {
+
+                                callback(err);
+                            });
+                        }, function (err) {
+
+                            var o = {id:homepageId,name:siteName+"["+homepageTitle+"]",children:childSites};
+                            root.children.push(o);
+
+                            callback();
+                        });
+                    });
+                });
+            },
+
+            function(err){
+
+                handleResult(err, root);
+            });
         });
     });
 }
 
-function countChildPage(collection, pageUrls, resUrls, pageUrl, rescure, handleResult) {
+/**
+ * 扫描子页面
+ */
+function scanChildPages(siteName, pageUrl, urlSet, hostSet, childSites, callback) {
 
-	//log("正在查找页面 "+pageUrl+"...");
-	collection.findOne({url: pageUrl}, function (err, page) {
-	
-		if (err) return handleResult(err);
-	
-		if (page==null)  {
+    if (urlSet.contains(pageUrl)) {
 
-			//log("页面 "+pageUrl+" 尚未爬出!");
-			return handleResult(null, 0, 1, 0);
-		}
+        log("子页面 "+pageUrl+" 已经处理过");
+        return callback();
+    }
+    urlSet.add(pageUrl);
 
-		var okPageSum = 1, unknownPageSum = 0, resSum = 0;
+    var hostName = url.parse(pageUrl).hostname;
+    if (hostSet.contains(hostName)) {
 
-		for (var linkIndex in page.links_res) {
+        log("子页面 "+pageUrl+" 所属的主机已经存在");
+    } else if (!new RegExp('.*'+siteName+'$').test(hostName)){
 
-			var link = page.links_res[linkIndex];
+        log("主机 "+hostName+" 不属于站点 "+siteName);
+        
+        return callback();
+    } else {
 
-			if (resUrls.contains(link.url)) continue;
+        log("扫描到新的主机: "+hostName);
+        hostSet.add(hostName);
+    }
 
-			resUrls.add(link.url);
-			resSum++;
-		}
-		
-		async.forEachSeries(page.links_page, function (childPage, callback) {
-			
-                        var childPageUrl = childPage.url;
-
-                        if (pageUrls.contains(childPageUrl)) return callback();
-
-                        pageUrls.add(childPageUrl);
-
-			if (rescure) {
-
-				countChildPage(collection, pageUrls, resUrls, childPageUrl, rescure, function (err, okPageCount, unknownPageCount, resCount) {
-					
-					if (err) return callback(err);
-
-					okPageSum += okPageCount;
-					unknownPageSum += unknownPageCount;
-					resSum += resCount;
-
-					callback();
-				});
-			} else {
-
-				callback();
-			}
-		}, function (err) {
-			
-			handleResult(err, okPageSum, unknownPageSum, resSum);
-		});
-
-	});
-}
-
-function countSite(siteUrl, rescure, handleResult) {
-
-    log("正在统计站点 "+siteUrl+" 页面/资源个数...");
     db.collection("page", {safe:false}, function(err, collection){
 
-		if (err) return handleResult(err);
+        if (err) return callback(err);
 
-		var pageUrls = new hashes.HashSet();
-                var resUrls = new hashes.HashSet();
-		pageUrls.add(siteUrl);
-		countChildPage(collection, pageUrls, resUrls, siteUrl, rescure, function (err, okPageCount, unknownPageCount, resCount) {
-			
-			handleResult(err, okPageCount, unknownPageCount, resCount);
-		});
+        log("获取子页面 "+pageUrl+" 的信息...");
+        collection.findOne({url:pageUrl}, function (err, page) {
+
+            if (err) return callback(err);
+
+            if (!page) {
+
+                log("无子页面 "+pageUrl+" 的信息");
+
+                var o = {id:"unknown_page_"+nextUnknownSiteId++,name:hostName+"[无页面信息]",children:[]};
+                childSites.push(o);
+
+                return callback();
+            }
+
+            var pageId = page._id;
+            var pageTitle = page.title;
+
+            log("页面 "+pageUrl+" 的信息找到：标题为\""+pageTitle+"\"，共 "+page.links_res.length+" 个资源，"+page.links_page.length+" 个子页面");
+
+            async.forEachSeries(page.links_page, function (childPage, callback) {
+
+                log("分析子页面 "+childPage.url+"...");
+
+                 scanChildPages(siteName, childPage.url, urlSet, hostSet, childSites, function(err) {
+
+                     callback(err);
+                 });
+            }, function (err) {
+
+                if (err) return callback(err);
+
+                var o = {id:pageId,name:hostName,children:[]};
+                childSites.push(o);
+
+                callback();
+            });
+        });
+    },
+    function(err) {
+        callback(err, hashTable.getKeyValuePairs());
     });
 }
 
-function countSite2(siteUrl, handleResult) {
+function countSite(siteUrl, handleResult) {
 
     log("正在统计站点 "+siteUrl+" 页面/资源个数...");
-    db.collection("site", {safe:false}, function(err, collection){
-
-        if (err) return handleResult(err);
-
-        collection.findOne({url:siteUrl}, function (err, site) {
-
-            if (err) return handleResult(err);
-            if (site==null) return handleResult("该站点不存在！")
-            handleResult(null, site.links_page.length, site.links_res.length);
+    var siteTag, pageCount, resCount;
+    async.series([
+        function(callback) {
+            db.collection("site", {safe:false}, function(err, collection){
+                if (err) return callback(err);
+                collection.findOne({url:siteUrl}, function (err, site) {
+                    if (err) return callback(err);
+                    if (site==null) return callback("该站点不存在！")
+                    siteTag = site.tag;
+                    callback();
+                });
+            });
+        },
+        function(callback) {
+    	    redisPool.acquire(function(err, redis) {
+		if (err) return callback(err);
+                async.series([
+                    function(callback) {
+                        redis.scard("site:"+siteTag+":links_page", function(err, count) {
+                            if (err) return callback(err);
+                            pageCount = count;
+                            callback();
+                        });
+                    },
+                    function(callback) {
+                        redis.scard("site:"+siteTag+":links_res", function(err, count) {
+                            if (err) return callback(err);
+                            resCount = count;
+                            callback();
+                        });
+                    }],
+                    function(err) {
+                        redisPool.release(redis);
+                        callback(err);
+                    });
+	        });            
+        }],
+        function(err) {
+            handleResult(err, pageCount, resCount);
         });
-    });
 }
 
 function openDatabase(callback) {
@@ -193,4 +346,25 @@ function main(fn) {
 
 void main(function () {
 
+	redisPool = poolModule.Pool({
+		name     : 'redis',
+		create   : function(callback) {
+			var redis = _redis.createClient(REDIS_PORT, REDIS_SERVER);
+			redis.on("ready", function (err) {
+				callback(null, redis);
+			});
+			redis.on("error", function (err) {
+				log(err);
+				callback(err, null);
+			});
+		},
+		destroy  : function(redis) { redis.end(); },
+		max      : 2,
+		// optional. if you set this, make sure to drain() (see step 3)
+		min      : 0, 
+		// specifies how long a resource can stay idle in pool before being removed
+		idleTimeoutMillis : 1000*30,
+		 // if true, logs via console.log - can also be a function
+		log : false 
+	});	
 });

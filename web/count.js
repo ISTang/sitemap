@@ -37,7 +37,7 @@ void main(function () {
 
 		if (err) process.exit(2);
 
-		db.countSite2(process.argv[2], function (err, pageCount, resCount) {
+		db.countSite(process.argv[2], function (err, pageCount, resCount) {
 	
 			if (err) log(err);
 			else log("总共 "+pageCount+" 个页面，"+resCount+" 个资源。");

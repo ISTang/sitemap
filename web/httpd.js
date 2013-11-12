@@ -26,7 +26,7 @@ webapp.configure(function () {
     webapp.set('views', __dirname + '/views');
     webapp.set('view engine', 'html');
 
-    webapp.use(express.logger());
+    //webapp.use(express.logger());
     webapp.use(function (req, res, next) {
         /*var data = '';
          req.setEncoding('utf-8');
@@ -56,7 +56,7 @@ webapp.configure('production', function () {
     webapp.use(express.errorHandler());
 });
 
-var logStream = LOG_ENABLED ? fs.createWriteStream("logs/httpd.log", {"flags": "a"}) : null;
+var logStream = fs.createWriteStream("logs/httpd.log", {"flags": "a"});
 
 Date.prototype.Format = utils.DateFormat;
 
@@ -69,7 +69,7 @@ function log(msg) {
     var strDatetime = now.Format("yyyy-MM-dd HH:mm:ss");
     var buffer = "[" + strDatetime + "] " + msg + "[httpd]";
     if (logStream != null) logStream.write(buffer + "\r\n");
-    console.log(buffer);
+    if (LOG_ENABLED) console.log(buffer);
 }
 
 function main(fn) {
@@ -95,55 +95,66 @@ void main(function () {
     process.on('SIGINT', aboutExit);
     process.on('SIGTERM', aboutExit);
 
-    webapp.get('/', function (req, res) {
-        res.setHeader("Content-Type", "text/html");
-        res.render('index', {
-            pageTitle: '网站元素分析 - 首页'
-        });
-    });
-
-    webapp.get('/pages/:id', function (req, res) {
-        var pageUrl = querystring.unescape(req.params.id);
-        if (pageUrl=="root") {
-            db.getAllSites(function (err, root) {
-                res.setHeader("Content-Type", "application/json;charset=utf-8");
-                if (err) res.json({id:"root",name:"根", children:[{id:"1",name:err}]});
-                else res.json(root);
-            });
-        } else {
-            db.getPages(pageUrl, function (err, pages) {
-                res.setHeader("Content-Type", "application/json;charset=utf-8");
-                if (err) res.json({children:[]});
-                else res.json({children:pages});
-            });
+    db.openDatabase(function(err) {
+	if (err) {
+            process.exit(1);
         }
-    });
 
-    webapp.get('/resources/:pageId', function (req, res) {
-        var pageId = req.params.pageId;
-        var includeChildPages = req.query.includeChildPages==="true"?true:false;
-        var includedUrlString = req.query.includedUrlString?querystring.unescape(req.query.includedUrlString):"";
-        var exportFile = req.query.export==="true"?true:false;
-        db.getResources(pageId, includeChildPages, includedUrlString, function (err, resources) {
-            if (!exportFile) {
-                res.setHeader("Content-Type", "application/json;charset=utf-8");
-                if (err) res.json([{id:0,row:1,url:err,type:"错误"}]);
-                else res.json(resources);
+        webapp.get('/', function (req, res) {
+            log("打开首页...");
+            res.setHeader("Content-Type", "text/html");
+            res.render('index', {
+               pageTitle: '网站元素分析 - 首页'
+            });
+        });
+
+        webapp.get('/pages/:id', function (req, res) {
+           var pageUrl = querystring.unescape(req.params.id);
+           if (pageUrl=="root") {
+               log("获取所有站点...");
+                db.getAllSites(function (err, root) {
+                    res.setHeader("Content-Type", "application/json;charset=utf-8");
+                    if (err) res.json({id:"root",name:"根", children:[{id:"1",name:err}]});
+                    else res.json(root);
+                });
             } else {
-                res.setHeader("Content-Disposition", "attachment; filename=\"" + pageId + "\"");
-                if (err) {
-                    res.write(err);
-                } else {
-                    for (var i in resources) {
-                        var resource = resources[i];
-                        res.write("#"+resource.row+"["+resource.type+"] "+resource.url+"\r\n");
-                    }
-                }
-                res.end();
+               log("获取页面 "+pageUrl+" 的子页面...");
+                db.getPages(pageUrl, function (err, pages) {
+                    res.setHeader("Content-Type", "application/json;charset=utf-8");
+                    if (err) res.json({children:[]});
+                    else res.json({children:pages});
+                });
             }
         });
+
+        webapp.get('/resources/:pageId', function (req, res) {
+            var pageId = req.params.pageId;
+            var includeChildPages = req.query.includeChildPages==="true"?true:false;
+            var includedUrlString = req.query.includedUrlString?querystring.unescape(req.query.includedUrlString):"";
+            var exportFile = req.query.export==="true"?true:false;
+            db.getResources(pageId, includeChildPages, includedUrlString, function (err, resources) {
+                if (!exportFile) {
+                    res.setHeader("Content-Type", "application/json;charset=utf-8");
+                    if (err) res.json([{id:0,row:1,url:err,type:"错误"}]);
+                    else res.json(resources);
+                } else {
+                    res.setHeader("Content-Disposition", "attachment; filename=\"" + pageId + "\"");
+                    if (err) {
+                        res.write(err);
+                    } else {
+                        for (var i in resources) {
+                            var resource = resources[i];
+                            res.write("#"+resource.row+"["+resource.type+"] "+resource.url+"\r\n");
+                        }
+                    }
+                    res.end();
+                }
+            });
+        });
+
+        webapp.listen(HTTPD_PORT);
+        log('HTTPD process is running at port ' + HTTPD_PORT + '...');
+
     });
 
-    webapp.listen(HTTPD_PORT);
-    log('HTTPD process is running at port ' + HTTPD_PORT + '...');
 });
