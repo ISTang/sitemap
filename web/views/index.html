@@ -115,7 +115,7 @@
                             ], function(JsonRest, Memory, Cache, DataGrid, ObjectStore, query){
                                 var myStore, dataStore, grid;
                                 myStore = new Cache(JsonRest({target:"/resources/"+myTree.selectedItems[0].id+
-                                    "?includeChildPages="+includeChildPages.get("value")+"&includedUrlString="+escape(urlToSearch.value)}), new Memory());
+                                    "?includedUrlString="+escape(urlToSearch.value)}), new Memory());
                                 grid = new DataGrid({
                                     store: dataStore = new ObjectStore({objectStore: myStore}),
                                     structure: [
@@ -138,12 +138,8 @@
        </div>
         <div data-dojo-props="region: 'bottom'" id="urlActions"
              data-dojo-type="dijit/layout/BorderContainer">
-            <div data-dojo-type="dijit/layout/ContentPane" id="includeChildPages"
+            <div data-dojo-type="dijit/layout/ContentPane" id="unused_region"
                  data-dojo-props="region: 'center'">
-                <input data-dojo-type="dijit/form/CheckBox" data-dojo-id="includeChildPages"
-                       id="chkIncludeChildPages"
-                       name="includeChildPages" value="true" checked/>
-                <label for="includeChildPages"">包含子页面中的资源</label>
             </div>
             <div data-dojo-type="dijit/layout/ContentPane" id="exportUrls"
                  data-dojo-props="region: 'right'">
@@ -153,7 +149,7 @@
                         if (!myTree.selectedItems[0]) return;
 
                         var url = "/resources/"+myTree.selectedItems[0].id+
-                            "?includeChildPages="+includeChildPages.get("value")+(urlToSearch.value==""?"":"&includedUrlString="+escape(urlToSearch.value))+"&export=true";
+                            "?includedUrlString="+escape(urlToSearch.value))+"&export=true";
 
                         if (dojo.isOpera) {
                             dojo.io.iframe.send({

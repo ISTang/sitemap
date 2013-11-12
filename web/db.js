@@ -38,7 +38,8 @@ var redisPool;
 var db;
 
 String.prototype.contains = utils.contains;
-Date.prototype.Format = utils.DateFormat;
+Date.prototype.format = utils.DateFormat;
+Number.prototype.format = utils.NumberFormat;
 
 var nextUnknownSiteId = 0;
 
@@ -48,7 +49,7 @@ var nextUnknownSiteId = 0;
 function log(msg) {
 
     var now = new Date();
-    var strDatetime = now.Format("yyyy-MM-dd HH:mm:ss");
+    var strDatetime = now.format("yyyy-MM-dd HH:mm:ss");
     var buffer = "[" + strDatetime + "] " + msg + "[db]";
     if (logStream != null) logStream.write(buffer + "\r\n");
     if (LOG_ENABLED) console.log(buffer);
@@ -280,44 +281,74 @@ function openDatabase(callback) {
 function getChildSites(siteName, homepageUrl, urlSet, hostSet, childSites, callback) {
 
     log("获取站点 " + siteName + " 中的子站点...");
+
     var siteTag;
+
     async.series([
         function (callback) {
+
             db.collection("site", {safe: false}, function (err, collection) {
+
                 if (err) return callback(err);
+
                 log("获取站点标记...");
+
                 collection.findOne({url: homepageUrl}, function (err, site) {
+
                     if (err) return callback(err);
+
                     if (site == null) return callback("站点 " + siteName + " 不存在！")
+
                     siteTag = site.tag;
+                    log("站点标记为 "+siteTag);
+
                     callback();
                 });
             });
         },
         function (callback) {
             redisPool.acquire(function (err, redis) {
+
                 if (err) return callback(err);
-                log("正在分析站点 " + siteName + " 中的所有页面...");
+
+                log("获取站点 " + siteName + " 中的所有页面...");
+
                 redis.smembers("site:" + siteTag + ":links_page", function (err, pageUrls) {
+
                     redisPool.release(redis);
+
                     if (err) return callback(err);
+
+                    log("站点 " + siteName + " 共有 "+pageUrls.length+" 个页面");
+
                     var nextChildSiteId = 0;
+
+                    var pageCounter = 1;
                     async.forEachSeries(pageUrls, function (pageUrl, callback) {
+
+                        log("分析页面 "+pageUrl+"..."+(pageCounter*100.0/pageUrls.length).format("0.0")+"%");
+
                         var hostName = url.parse(pageUrl).hostname;
+
                         if (hostSet.contains(hostName)) return callback();
+
                         if (!new RegExp('.*' + siteName + '$').test(hostName)) return callback();
                         log("扫描到新的站点: " + hostName);
                         hostSet.add(hostName);
+
                         var o = {id: siteName + "_child_" + nextChildSiteId++, name: hostName, children: []};
                         childSites.push(o);
+
                         callback();
                     }, function (err) {
+
                         callback(err);
                     });
                 });
             });
         }],
         function (err) {
+
             callback(err);
         });
 }
