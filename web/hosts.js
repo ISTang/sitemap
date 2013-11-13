@@ -31,26 +31,36 @@ void main(function () {
 
         console.log("用法: " + process.argv[0] + " " + process.argv[1] + " <siteName>");
         process.exit(1);
-	return;
     }
 
     db.openDatabase(function (err) {
 
-        if (err) { process.exit(2); return; }
+        if (err) {
+            process.exit(2);
+        }
 
         var siteName = process.argv[2];
 
         log("获取属于站点 " + siteName + " 的所有主机...");
         db.getSiteIdByName(siteName, function (err, siteId) {
 
-            if (err) { log(err); process.exit(3); return; }
+            if (err) {
+                log(err);
+                process.exit(3);
+            }
 
-	    if (!siteId) { log("站点 "+siteName+" 未找到"); process.exit(4); return; }
+            if (!siteId) {
+                log("站点 " + siteName + " 未找到");
+                process.exit(4);
+            }
 
             var childSites = [];
             db.getChildSites(siteId, childSites, function (err) {
 
-                if (err) { log(err); process.exit(5); return; }
+                if (err) {
+                    log(err);
+                    process.exit(5);
+                }
 
                 log("站点 " + siteName + " 有以下子站点:");
                 for (var hostIndex in childSites) {
