@@ -130,6 +130,8 @@ function getAllSites(handleResult) {
 
                                 if (err) return callback(err);
 
+                                log("站点 " + siteName + " 共有 "+childSites.length+" 个子站点");
+
                                 var o = {id: homepageId, name: siteName + "[" + homepageTitle + "]", children: childSites};
                                 root.children.push(o);
 
@@ -328,7 +330,7 @@ function getChildSites(siteName, homepageUrl, urlSet, hostSet, childSites, callb
                     function (callback) {
 
                         var nextPageIndex = 0;
-                        const MAX_PAGES = 4096;
+                        const MAX_PAGES = 2048;
                         var nextChildSiteId = 0;
                         async.whilst(
                             function () {
@@ -336,7 +338,9 @@ function getChildSites(siteName, homepageUrl, urlSet, hostSet, childSites, callb
                             },
                             function (callback) {
 
-                                log("获取站点 " + siteName + " 中的第 "+(nextPageIndex)+" 至 "+(nextPageIndex+MAX_PAGES-1)+" 个页面(还剩 "+(pageCount-(nextPageIndex+MAX_PAGES))+")...");
+                                //var leftPageCount = pageCount-(nextPageIndex+MAX_PAGES);
+                                //if (leftPageCount<0) leftPageCount = 0;
+                                //log("获取站点 " + siteName + " 中的第 "+(nextPageIndex)+" 至 "+(nextPageIndex+MAX_PAGES-1)+" 个页面(还剩 "+leftPageCount+")...");
 
                                 redis.zrange("site:" + siteTag + ":links_page", nextPageIndex, nextPageIndex+MAX_PAGES-1, function (err, pageUrls) {
 
@@ -352,7 +356,7 @@ function getChildSites(siteName, homepageUrl, urlSet, hostSet, childSites, callb
                                         if (hostSet.contains(hostName)) return callback();
 
                                         if (!new RegExp('.*' + siteName + '$').test(hostName)) return callback();
-                                        log("扫描到新的站点: " + hostName);
+                                        //log("扫描到新的站点: " + hostName);
                                         hostSet.add(hostName);
 
                                         var o = {id: siteName + "_child_" + nextChildSiteId++, name: hostName, children: []};

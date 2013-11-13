@@ -5,7 +5,7 @@ var utils = require(__dirname + '/utils');
 
 const LOG_ENABLED = config.LOG_ENABLED;
 
-var logStream = LOG_ENABLED ? fs.createWriteStream("logs/httpd.log", {"flags": "a"}) : null;
+var logStream = LOG_ENABLED ? fs.createWriteStream("logs/count.log", {"flags": "a"}) : null;
 
 Date.prototype.Format = utils.DateFormat;
 
