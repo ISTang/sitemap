@@ -236,14 +236,14 @@ function countSite(siteUrl, handleResult) {
                 if (err) return callback(err);
                 async.series([
                     function (callback) {
-                        redis.scard("site:" + siteTag + ":links_page", function (err, count) {
+                        redis.zcard("site:" + siteTag + ":links_page", function (err, count) {
                             if (err) return callback(err);
                             pageCount = count;
                             callback();
                         });
                     },
                     function (callback) {
-                        redis.scard("site:" + siteTag + ":links_res", function (err, count) {
+                        redis.zcard("site:" + siteTag + ":links_res", function (err, count) {
                             if (err) return callback(err);
                             resCount = count;
                             callback();

@@ -116,12 +116,12 @@ function NumberFormat(format) {
         psplit = format.stripNonNumeric().split('.'),
         that = this;
 // compute precision
-    if (1 &lt; psplit.length) {
+    if (1 < psplit.length) {
         // fix number precision
         that = that.toFixed(psplit[1].length);
     }
 // error: too many periods
-    else if (2 &lt; psplit.length) {
+    else if (2 < psplit.length) {
         throw('NumberFormatException: invalid format, formats should have no more than 1 period: ' + format);
     }
 // remove precision
@@ -140,7 +140,7 @@ function NumberFormat(format) {
             m = Math.floor(j / 3),
             n = cnum.length % 3 || 3; // n cannot be ZERO or causes infinite loop
         // break the number into chunks of 3 digits; first chunk may be less than 3
-        for (var i = 0; i &lt; j; i += n) {
+        for (var i = 0; i < j; i += n) {
             if (i != 0) {
                 n = 3;
             }
