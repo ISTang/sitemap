@@ -197,101 +197,133 @@ function getChildSites(siteId, childSites, callback) {
 
                     log("站点 " + siteName + " 的主机信息"+(exists?"已经":"不")+"存在...");
 
-                    if (exists) {
+                    var pageCount;
+                    var lastPageCount;
+                    async.series([
+                        function (callback) {
 
-                        log("从缓存获取站点 " + siteName + " 的主机信息...");
-                        redis.smembers("site:" + siteTag + ":hosts", function (err, hosts) {
+                            log("获取站点 " + siteName + " 的最新页面数量...");
+                            redis.zcard("site:" + siteTag + ":links_page", function (err, count) {
 
-                            if (err) { redisPool.release(redis); return callback(err); }
+                                if (err) return callback(err);
 
-                            var nextChildSiteId = 0;
-                            for (var hostIndex in hosts) {
+                                pageCount = count;
+                                log("站点 " + siteName + " 总共有 " + pageCount + " 个页面");
+                                callback();
+                            });
+                        },
+                        function (callback) {
 
-                                var host = hosts[hostIndex];
-                                var o = {id: siteName + "_child_" + nextChildSiteId++, name: host, children: []};
-                                childSites.push(o);
+                            log("获取站点 " + siteName + " 的已分析页面数量...");
+                            redis.get("site:" + siteTag + ":page_count", function (err, value) {
+
+                                if (err) return callback(err);
+                                lastPageCount = value||0;
+
+                                log("站点 " + siteName + "  已分析的页面数为" + lastPageCount);
+                                callback();
+                            });
+                        },
+                        function (callback) {
+
+                            if (exists) {
+
+                                if (lastPageCount>=pageCount) {
+
+                                    log("从缓存获取站点 " + siteName + " 的主机信息...");
+                                    redis.smembers("site:" + siteTag + ":hosts", function (err, hosts) {
+
+                                        if (err) { redisPool.release(redis); return callback(err); }
+
+                                        var nextChildSiteId = 0;
+                                        for (var hostIndex in hosts) {
+
+                                            var host = hosts[hostIndex];
+                                            var o = {id: siteName + "_child_" + nextChildSiteId++, name: host, children: []};
+                                            childSites.push(o);
+                                        }
+
+                                        return callback();
+                                    });
+                                } else {
+
+                                    log("清除站点 " + siteName + " 的主机信息缓存...");
+                                    redis.del("site:" + siteTag + ":hosts");
+                                    redis.del("site:" + siteTag + ":page_count");
+                                }
                             }
 
-                            callback();
-                        });
-                    } else {
+                            log("立即生成站点 " + siteName + " 的主机信息...");
+                            async.series([
+                                function (callback) {
 
-                        log("立即生成站点 " + siteName + " 的主机信息...");
+                                    urlSet.add(homepageUrl);
+                                    hostSet.add(siteName);
 
-                        var pageCount;
-                        async.series([
-                            function (callback) {
+                                    var nextPageIndex = 0;
+                                    const MAX_PAGES = 2048;
+                                    var nextChildSiteId = 0;
 
-                                log("获取站点 " + siteName + " 的页面数量...");
-                                redis.zcard("site:" + siteTag + ":links_page", function (err, count) {
+                                    async.whilst(
+                                        function () {
+                                            return (nextPageIndex <= pageCount);
+                                        },
+                                        function (callback) {
 
-                                    if (err) return callback(err);
+                                            //var leftPageCount = pageCount-(nextPageIndex+MAX_PAGES);
+                                            //if (leftPageCount<0) leftPageCount = 0;
+                                            //log("获取站点 " + siteName + " 中的第 "+(nextPageIndex)+" 至 "+(nextPageIndex+MAX_PAGES-1)+" 个页面(还剩 "+leftPageCount+")...");
 
-                                    pageCount = count;
-                                    log("站点 " + siteName + " 总共有 " + pageCount + " 个页面");
-                                    callback();
-                                });
-                            },
-                            function (callback) {
+                                            redis.zrange("site:" + siteTag + ":links_page", nextPageIndex, nextPageIndex + MAX_PAGES - 1, function (err, pageUrls) {
 
-                                urlSet.add(homepageUrl);
-                                hostSet.add(siteName);
+                                                if (err) return callback(err);
 
-                                var nextPageIndex = 0;
-                                const MAX_PAGES = 2048;
-                                var nextChildSiteId = 0;
+                                                nextPageIndex += MAX_PAGES;
 
-                                async.whilst(
-                                    function () {
-                                        return (nextPageIndex <= pageCount);
-                                    },
-                                    function (callback) {
+                                                async.forEachSeries(pageUrls, function (pageUrl, callback) {
 
-                                        //var leftPageCount = pageCount-(nextPageIndex+MAX_PAGES);
-                                        //if (leftPageCount<0) leftPageCount = 0;
-                                        //log("获取站点 " + siteName + " 中的第 "+(nextPageIndex)+" 至 "+(nextPageIndex+MAX_PAGES-1)+" 个页面(还剩 "+leftPageCount+")...");
+                                                    var hostName = url.parse(pageUrl).hostname;
+                                                    if (hostName.indexOf("www.") == 0) hostName = hostName.substring(4); // remove www. prefix
 
-                                        redis.zrange("site:" + siteTag + ":links_page", nextPageIndex, nextPageIndex + MAX_PAGES - 1, function (err, pageUrls) {
+                                                    if (hostSet.contains(hostName)) return callback();
 
-                                            if (err) return callback(err);
+                                                    if (!new RegExp('.*' + siteName + '$').test(hostName)) return callback();
+                                                    //log("扫描到新的站点: " + hostName);
+                                                    hostSet.add(hostName);
 
-                                            nextPageIndex += MAX_PAGES;
+                                                    redis.sadd("site:" + siteTag + ":hosts", hostName); // save to cache
 
-                                            async.forEachSeries(pageUrls, function (pageUrl, callback) {
+                                                    var o = {id: siteName + "_child_" + nextChildSiteId++, name: hostName, children: []};
+                                                    childSites.push(o);
 
-                                                var hostName = url.parse(pageUrl).hostname;
-                                                if (hostName.indexOf("www.") == 0) hostName = hostName.substring(4); // remove www. prefix
+                                                    callback();
+                                                }, function (err) {
 
-                                                if (hostSet.contains(hostName)) return callback();
-
-                                                if (!new RegExp('.*' + siteName + '$').test(hostName)) return callback();
-                                                //log("扫描到新的站点: " + hostName);
-                                                hostSet.add(hostName);
-
-                                                redis.sadd("site:" + siteTag + ":hosts", hostName); // save to cache
-
-                                                var o = {id: siteName + "_child_" + nextChildSiteId++, name: hostName, children: []};
-                                                childSites.push(o);
-
-                                                callback();
-                                            }, function (err) {
-
-                                                callback(err);
+                                                    callback(err);
+                                                });
                                             });
-                                        });
-                                    },
-                                    function (err) {
+                                        },
+                                        function (err) {
 
-                                        callback(err);
-                                    }
-                                );
-                            }
-                        ], function (err) {
+                                            callback(err);
+                                        }
+                                    );
+                                },
+                                function (callback) {
 
-                            redisPool.release(redis);
-                            callback(err);
-                        });
-                    }
+                                    log("记录站点 " + siteName + " 的页面数量...");
+                                    redis.set("site:" + siteTag + ":page_count", pageCount, callback);
+                                }
+                            ], function (err) {
+
+                                callback(err);
+                            });
+                        }
+                    ], function (err) {
+
+                       redisPool.release(redis);
+                       callback(err);
+                    });
                 });
             });
         }],
