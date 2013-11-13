@@ -239,7 +239,7 @@ function getChildSites(siteId, childSites, callback) {
                                         for (var hostIndex in hosts) {
 
                                             var host = hosts[hostIndex];
-                                            var o = {id: siteName + "_child_" + nextChildSiteId++, name: host, children: []};
+                                            var o = {id: siteName + "_child_" + nextChildSiteId++, name: host};
                                             childSites.push(o);
                                         }
 
@@ -293,7 +293,7 @@ function getChildSites(siteId, childSites, callback) {
 
                                                     redis.sadd("site:" + siteTag + ":hosts", hostName); // save to cache
 
-                                                    var o = {id: siteName + "_child_" + nextChildSiteId++, name: hostName, children: []};
+                                                    var o = {id: siteName + "_child_" + nextChildSiteId++, name: hostName};
                                                     childSites.push(o);
 
                                                     callback();
