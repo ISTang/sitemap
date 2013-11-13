@@ -31,7 +31,7 @@
                         for (var i in sites) {
                             var site = sites[i];
                             if (site.item.name.contains(txtSiteToFind.value, true)) {
-                                pageUrl.set("content", "<strong>"+site.item.name+"</strong>");
+                                siteName.set("content", "<strong>"+site.item.name+"</strong>");
                                 myTree.set("paths", [["root", site.item.id]]).then(function(){myTree.focus()});
                                 break;
                             }
@@ -40,11 +40,11 @@
                 </button>
             </div>
         </div>
-        <div data-dojo-type="dijit/layout/ContentPane" id="pageTree"
+        <div data-dojo-type="dijit/layout/ContentPane" id="siteTree"
              data-dojo-props="region: 'center'">
             <!-- Create the store -->
-            <div data-dojo-type="dojo/store/JsonRest" data-dojo-id="pagesStore"
-                 data-dojo-props="target: '/pages/'">
+            <div data-dojo-type="dojo/store/JsonRest" data-dojo-id="sitesStore"
+                 data-dojo-props="target: '/sites/'">
                 <script type="dojo/method" data-dojo-event="getChildren" data-dojo-args="object">
                     return this.get(escape(object.id)).then(function(fullObject){
                         return fullObject.children;
@@ -52,8 +52,8 @@
                 </script>
             </div>
             <!-- Create the model bridging the store and the Tree -->
-            <div data-dojo-type="dijit/tree/ObjectStoreModel" data-dojo-id="pagesModel"
-                 data-dojo-props="store: pagesStore">
+            <div data-dojo-type="dijit/tree/ObjectStoreModel" data-dojo-id="sitesModel"
+                 data-dojo-props="store: sitesStore">
                 <script type="dojo/method" data-dojo-event="getRoot" data-dojo-args="onItem">
                     this.store.get("root").then(onItem);
                 </script>
@@ -63,9 +63,9 @@
             </div>
             <!-- Create the tree -->
             <div data-dojo-type="dijit/Tree"data-dojo-id="myTree" id="myTree"
-                 data-dojo-props="model: pagesModel, persist: false, showRoot: false">
+                 data-dojo-props="model: sitesModel, persist: false, showRoot: false">
                 <script type="dojo/on" data-dojo-event="click" data-dojo-args="item, node, evt">
-                    pageUrl.set("content", "<strong>"+node.label+"</strong>");
+                    siteUrl.set("content", "<strong>"+node.label+"</strong>");
                 </script>
             </div>
         </div>
@@ -78,9 +78,9 @@
          class="centerPanel">
         <div data-dojo-type="dijit/layout/BorderContainer" id="searchForUrl"
              data-dojo-props="region: 'top'">
-            <div data-dojo-type="dijit/layout/ContentPane" data-dojo-id="pageUrl" id="pageUrl"
+            <div data-dojo-type="dijit/layout/ContentPane" data-dojo-id="siteName" id="siteName"
                  data-dojo-props="region: 'center'">
-                请先从左边页面树中选中一个页面，然后点击搜索按钮...
+                请先从左边站点树中选中一个站点，然后点击搜索按钮...
             </div>
             <div data-dojo-type="dijit/layout/BorderContainer" id="searchUrl"
                  data-dojo-props="region: 'right'">

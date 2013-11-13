@@ -108,21 +108,21 @@ void main(function () {
             });
         });
 
-        webapp.get('/pages/:id', function (req, res) {
-           var pageUrl = querystring.unescape(req.params.id);
-           if (pageUrl=="root") {
-               log("获取所有站点...");
-                db.getAllSites(function (err, root) {
+        webapp.get('/sites/:id', function (req, res) {
+           var siteId = querystring.unescape(req.params.id);
+           if (siteId=="root") {
+               log("获取主站点...");
+                db.getMainSites(function (err, root) {
                     res.setHeader("Content-Type", "application/json;charset=utf-8");
                     if (err) res.json({id:"root",name:"根", children:[{id:"1",name:err}]});
                     else res.json(root);
                 });
             } else {
-               log("获取页面 "+pageUrl+" 的子页面...");
-                db.getPages(pageUrl, function (err, pages) {
+               log("获取站点 "+siteId+" 的子站点...");
+                db.getChildSites(siteId, function (err, childSites) {
                     res.setHeader("Content-Type", "application/json;charset=utf-8");
                     if (err) res.json({children:[]});
-                    else res.json({children:pages});
+                    else res.json({children:childSites});
                 });
             }
         });
