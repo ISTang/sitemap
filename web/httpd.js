@@ -118,7 +118,7 @@ void main(function () {
                     else res.json(root);
                 });
             } else {
-                log("获取站点 "+siteId+" 的子站点...");
+                log("获取主站点 "+siteId+" 的子站点...");
                 var childSites = [];
                 db.getChildSites(siteId, childSites, function (err) {
                     res.setHeader("Content-Type", "application/json;charset=utf-8");
