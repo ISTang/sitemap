@@ -65,7 +65,7 @@
             <div data-dojo-type="dijit/Tree"data-dojo-id="myTree" id="myTree"
                  data-dojo-props="model: sitesModel, persist: false, showRoot: false">
                 <script type="dojo/on" data-dojo-event="click" data-dojo-args="item, node, evt">
-                    siteUrl.set("content", "<strong>"+node.label+"</strong>");
+                    siteName.set("content", "<strong>"+node.label+"</strong>");
                 </script>
             </div>
         </div>
@@ -80,7 +80,7 @@
              data-dojo-props="region: 'top'">
             <div data-dojo-type="dijit/layout/ContentPane" data-dojo-id="siteName" id="siteName"
                  data-dojo-props="region: 'center'">
-                请先从左边站点树中选中一个站点，然后点击搜索按钮...
+                请先从左边站点树中选中一个站点...
             </div>
             <div data-dojo-type="dijit/layout/BorderContainer" id="searchUrl"
                  data-dojo-props="region: 'right'">
