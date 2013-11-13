@@ -134,7 +134,8 @@ void main(function () {
                     reversedHosts.sort();
                     //
                     var root = {id: "root", name: siteName.split('.').reverse().join('.'), children:[]};
-                    var nodeStack = [root];
+                    var nodeStack = [];
+                    nodeStack.push(root);
                     for (var j in reversedHosts) {
                         var reversedHost = reversedHosts[j];
                         var o = {id:reversedHostIds[reversedHost], name:reversedHost};
@@ -148,7 +149,7 @@ void main(function () {
                             }
                         } while(true);
                     }
-                    var childSites = nodeStack.shift();
+                    var childSites = nodeStack.shift().children;
 
                     res.setHeader("Content-Type", "application/json;charset=utf-8");
                     if (err) res.json({children:[]});
