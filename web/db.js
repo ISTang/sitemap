@@ -327,22 +327,22 @@ function getChildSites(siteName, homepageUrl, urlSet, hostSet, childSites, callb
                     },
                     function (callback) {
 
-                        var nextPageScore = 1;
-                        const MAX_PAGES = 1024;
+                        var nextPageIndex = 0;
+                        const MAX_PAGES = 4096;
                         var nextChildSiteId = 0;
                         async.whilst(
                             function () {
-                                return (nextPageScore<=pageCount);
+                                return (nextPageIndex<=pageCount);
                             },
                             function (callback) {
 
-                                log("获取站点 " + siteName + " 中的第 "+(nextPageScore)+" 至 "+(nextPageScore+MAX_PAGES-1)+" 个页面...");
+                                log("获取站点 " + siteName + " 中的第 "+(nextPageIndex)+" 至 "+(nextPageIndex+MAX_PAGES-1)+" 个页面(还剩 "+(pageCount-(nextPageIndex+MAX_PAGES))+")...");
 
-                                redis.zrangebyscore("site:" + siteTag + ":links_page", nextPageScore, nextPageScore+MAX_PAGES-1, function (err, pageUrls) {
+                                redis.zrange("site:" + siteTag + ":links_page", nextPageIndex, nextPageIndex+MAX_PAGES-1, function (err, pageUrls) {
 
                                     if (err) return callback(err);
 
-                                    nextPageScore += MAX_PAGES;
+                                    nextPageIndex += MAX_PAGES;
 
                                     async.forEachSeries(pageUrls, function (pageUrl, callback) {
 
