@@ -27,31 +27,37 @@ function main(fn) {
 
 void main(function () {
 
-        if (process.argv.length<3) {
+    if (process.argv.length < 3) {
 
-                console.log("用法: "+process.argv[0]+" "+process.argv[1]+" <siteName>");
-                process.exit(1);
-        }
+        console.log("用法: " + process.argv[0] + " " + process.argv[1] + " <siteName>");
+        process.exit(1);
+    }
 
-	db.openDatabase(function(err) {
+    db.openDatabase(function (err) {
 
-		if (err) process.exit(2);
+        if (err) process.exit(2);
 
-                log("获取所有站点...");
-                db.getAllSites(function (err, root) {
+        var siteName = process.argv[2];
 
-                    for (siteIndex in root.children) {
+        log("获取属于站点 " + siteName + " 所有主机...");
+        db.getSiteIdByName(siteName, function (err, siteId) {
 
-                        var site = root.children[siteIndex];
-                        log("站点 "+site.name+" 有以下子站点:");
-                        for (hostIndex in site.children) {
+            if (err) { log(err); process.exit(3); }
 
-                            var host = site.children[hostIndex];
-                            log("[#"+(parseInt(hostIndex,10)+1)+"] "+host.name);
-                        }
-                    }
+            var childSites = [];
+            db.getChildSites(siteId, childSites, function (err) {
 
-    		    process.exit(0);
-                });
-	});
+                if (err) { log(err); process.exit(4); }
+
+                log("站点 " + site.name + " 有以下子站点:");
+                for (var hostIndex in childSites) {
+
+                    var host = childSites[hostIndex];
+                    log("[#" + (parseInt(hostIndex, 10) + 1) + "] " + host.name);
+                }
+
+                process.exit(0);
+            });
+        });
+    });
 });
