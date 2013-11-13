@@ -329,7 +329,7 @@ function getChildSites(siteId, childSites, callback) {
         }],
         function (err) {
 
-            callback(err);
+            callback(err, siteName);
         });
 }
 
