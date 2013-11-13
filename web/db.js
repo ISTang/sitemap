@@ -117,7 +117,7 @@ function getMainSites(handleResult) {
 }
 
 /**
- *     根据名字获取站点ID
+ * 根据名字获取站点ID
  */
 function getSiteIdByName(siteName, callback) {
 
@@ -132,7 +132,7 @@ function getSiteIdByName(siteName, callback) {
 
             if (err) return callback(err);
 
-            var siteId;
+            var siteId = null;
             for (var siteIndex in sites) {
 
                 var thisSite = sites[siteIndex];
@@ -140,11 +140,13 @@ function getSiteIdByName(siteName, callback) {
                 if (thisSiteName.indexOf("www.") == 0) thisSiteName = thisSiteName.substring(4); // remove www. prefix
                 if (siteName === thisSiteName) {
 
-                    siteId = site._id;
+                    siteId = thisSite._id.toString();
                     log("主站点 " + siteName + " 的 ID 为" + siteId);
                     break;
                 }
             }
+
+            if (!siteId) log("主站点 " + siteName + " 未找到");
             callback(null, siteId);
         });
     });
