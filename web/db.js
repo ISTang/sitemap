@@ -303,7 +303,7 @@ function getChildSites(siteTag, siteName, callback) {
 
                 if (err) return callback(err);
 
-            redis.set("site:" + siteTag + ":buidling_cache", 1);
+            redis.set("site:" + siteTag + ":building_cache", 1);
 
             log("清除站点 " + siteTag + " 的主机信息缓存...");
             redis.del("site:" + siteTag + ":hosts");
@@ -349,7 +349,7 @@ function getChildSites(siteTag, siteName, callback) {
 
                 log("记录站点 " + siteTag + " 的页面数量...");
                 redis.set("site:" + siteTag + ":page_count", pageCount);
-                redis.set("site:" + siteTag + ":buidling_cache", 0);
+                redis.set("site:" + siteTag + ":building_cache", 0);
 
                 redisPool.release(redis);
 
