@@ -269,8 +269,8 @@ function getSiteHosts(siteTag, siteName, callback, onCacheBuilt) {
                                             if (onCacheBuilt) onCacheBuilt(err);
                                         });
                                     }, 1000);
-
-                                    callback("后台开始" + (exists ? "重建" : "建立") + "缓存，请稍后再试...");
+                                    if (onCacheBuilt) { hosts = null; callback(); }
+                                    else callback("后台开始" + (exists ? "重建" : "建立") + "缓存，请稍后再试...");
                                 });
                             } else {
                                 callback();
