@@ -183,7 +183,7 @@ function makeDomainTree(siteName, hosts, callback) {
             if (!node) {
                 return callback('Data error: ' + JSON.stringify(hosts));
             }
-            if (reversedHost.indexOf(node.name) == 0) {
+            if (reversedHost.indexOf(node.name+'.') == 0) {
                 if (!node.children) node.children = [];
                 node.children.push(o);
                 nodeStack.push(node);
