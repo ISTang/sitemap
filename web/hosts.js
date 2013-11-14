@@ -56,6 +56,17 @@ void main(function () {
                     log("[#" + (parseInt(hostIndex, 10) + 1) + "] " + host.name);
                 }
 
+                utils.makeDomainTree(siteName, hosts, function (err, childSites) {
+                    if (err) log(err);
+                    else {
+                        for (var i in childSites) {
+                            var childSite = childSites[i];
+                            if (childSite.children) childSite.children = [];
+                        }
+                        log(JSON.stringify(childSites));
+                    }
+                });
+
                 process.exit(0);
             } else {
                 log("正在建立/重建缓存...");
