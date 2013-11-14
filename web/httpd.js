@@ -121,6 +121,7 @@ void main(function () {
                 log("获取主站点 "+siteId+" 的子站点...");
                 db.getChildSites(siteId, function (err, siteName, hosts) {
                     utils.makeDomainTree(siteName, hosts, function (err, childSites) {
+                        if (err) log(err);
                         res.setHeader("Content-Type", "application/json;charset=utf-8");
                         if (err) res.json({children:[]});
                         else res.json({children:childSites});
