@@ -39,7 +39,7 @@ void main(function () {
             process.exit(2);
         }
 
-        var siteTag = process.argv[2];
+        var siteTag = parseInt(process.argv[2], 10);
         var siteName = process.argv[3];
 
         db.getChildSites(siteTag, siteName, function (err, childSites) {

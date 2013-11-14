@@ -127,7 +127,7 @@ void main(function () {
                     res.json({children:[{id: siteId+"_1", name: err}]});
                     return;
                 }
-                var siteTag = siteId.substring(0, pos);
+                var siteTag = parseInt(siteId.substring(0, pos), 10);
                 var siteName = siteId.substring(pos+1);
                 db.getChildSites(siteTag, siteName, function (err, hosts) {
                     utils.makeDomainTree(siteName, hosts, function (err, childSites) {
