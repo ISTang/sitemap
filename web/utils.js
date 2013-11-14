@@ -165,9 +165,11 @@ function makeDomainTree(siteName, hosts, callback) {
     var reversedHostIds = {};
     for (var i in hosts) {
         var host = hosts[i];
-        var reversedHost = host.name.split('.').reverse().join('.');
-        reversedHosts.push(reversedHost);
-        reversedHostIds[reversedHost] = host.id;
+        if (new RegExp('.*?\\.' + siteName.replace('.', '\\.') + '$').test(host)) {
+            var reversedHost = host.name.split('.').reverse().join('.');
+            reversedHosts.push(reversedHost);
+            reversedHostIds[reversedHost] = host.id;
+        }
     }
     reversedHosts.sort();
     //

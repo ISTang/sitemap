@@ -27,9 +27,9 @@ function main(fn) {
 
 void main(function () {
 
-    if (process.argv.length < 3) {
+    if (process.argv.length < 4) {
 
-        console.log("用法: " + process.argv[0] + " " + process.argv[1] + " <siteName>");
+        console.log("用法: " + process.argv[0] + " " + process.argv[1] + " <siteTag> <siteName>");
         process.exit(1);
     }
 
@@ -39,37 +39,24 @@ void main(function () {
             process.exit(2);
         }
 
-        var siteName = process.argv[2];
+        var siteTag = process.argv[2];
+        var siteName = process.argv[3];
 
-        log("获取属于站点 " + siteName + " 的所有主机...");
-        db.getSiteIdByName(siteName, function (err, siteId) {
+        db.getChildSites(siteTag, siteName, function (err, childSites) {
 
             if (err) {
                 log(err);
                 process.exit(3);
             }
 
-            if (!siteId) {
-                log("站点 " + siteName + " 未找到");
-                process.exit(4);
+            log("站点 " + siteName + " 有以下子站点:");
+            for (var hostIndex in childSites) {
+
+                var host = childSites[hostIndex];
+                log("[#" + (parseInt(hostIndex, 10) + 1) + "] " + host.name);
             }
 
-            db.getChildSites(siteId, function (err, childSites) {
-
-                if (err) {
-                    log(err);
-                    process.exit(5);
-                }
-
-                log("站点 " + siteName + " 有以下子站点:");
-                for (var hostIndex in childSites) {
-
-                    var host = childSites[hostIndex];
-                    log("[#" + (parseInt(hostIndex, 10) + 1) + "] " + host.name);
-                }
-
-                process.exit(0);
-            });
+            process.exit(0);
         });
     });
 });

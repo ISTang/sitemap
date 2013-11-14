@@ -95,8 +95,8 @@ void main(function () {
     process.on('SIGINT', aboutExit);
     process.on('SIGTERM', aboutExit);
 
-    db.openDatabase(function(err) {
-	if (err) {
+    db.openDatabase(function (err) {
+        if (err) {
             process.exit(1);
         }
 
@@ -104,27 +104,42 @@ void main(function () {
             log("打开首页...");
             res.setHeader("Content-Type", "text/html");
             res.render('index', {
-               pageTitle: '网站元素分析 - 首页'
+                pageTitle: '网站元素分析 - 首页'
             });
         });
 
         webapp.get('/sites/:id', function (req, res) {
-           var siteId = querystring.unescape(req.params.id);
-           if (siteId=="root") {
-               log("获取主站点...");
+            res.setHeader("Content-Type", "application/json;charset=utf-8");
+
+            var siteId = querystring.unescape(req.params.id);
+            if (siteId == "root") {
+                log("获取主站点...");
                 db.getMainSites(function (err, root) {
-                    res.setHeader("Content-Type", "application/json;charset=utf-8");
-                    if (err) res.json({id:"root",name:"根", children:[{id:"1",name:err}]});
+                    if (err) res.json({id: "root", name: "根", children: [
+                        {id: "1", name: err}
+                    ]});
                     else res.json(root);
                 });
             } else {
-                log("获取主站点 "+siteId+" 的子站点...");
-                db.getChildSites(siteId, function (err, siteName, hosts) {
+                log("获取站点 " + siteId + " 的子站点...");
+                var pos = siteId.indexOf(":");
+                if (pos==-1) {
+                    res.json({children:[{id: siteId+"_1", name: err}]});
+                    return;
+                }
+                var siteTag = siteId.substring(0, pos);
+                var siteName = siteId.substring(pos+1);
+                db.getChildSites(siteTag, siteName, function (err, hosts) {
                     utils.makeDomainTree(siteName, hosts, function (err, childSites) {
                         if (err) log(err);
-                        res.setHeader("Content-Type", "application/json;charset=utf-8");
-                        if (err) res.json({children:[]});
-                        else res.json({children:childSites});
+                        else {
+                            for (var i in childSites) {
+                                var childSite = childSites[i];
+                                childSite.children = [];
+                            }
+                        }
+                        if (err) res.json({children: [{id: siteId+"_1", name: err}]});
+                        else res.json({children: childSites});
                     });
                 });
             }
@@ -132,13 +147,15 @@ void main(function () {
 
         webapp.get('/resources/:pageId', function (req, res) {
             var pageId = req.params.pageId;
-            var includeChildPages = req.query.includeChildPages==="true"?true:false;
-            var includedUrlString = req.query.includedUrlString?querystring.unescape(req.query.includedUrlString):"";
-            var exportFile = req.query.export==="true"?true:false;
+            var includeChildPages = req.query.includeChildPages === "true" ? true : false;
+            var includedUrlString = req.query.includedUrlString ? querystring.unescape(req.query.includedUrlString) : "";
+            var exportFile = req.query.export === "true" ? true : false;
             db.getResources(pageId, includeChildPages, includedUrlString, function (err, resources) {
                 if (!exportFile) {
                     res.setHeader("Content-Type", "application/json;charset=utf-8");
-                    if (err) res.json([{id:0,row:1,url:err,type:"错误"}]);
+                    if (err) res.json([
+                        {id: 0, row: 1, url: err, type: "错误"}
+                    ]);
                     else res.json(resources);
                 } else {
                     res.setHeader("Content-Disposition", "attachment; filename=\"" + pageId + "\"");
@@ -147,7 +164,7 @@ void main(function () {
                     } else {
                         for (var i in resources) {
                             var resource = resources[i];
-                            res.write("#"+resource.row+"["+resource.type+"] "+resource.url+"\r\n");
+                            res.write("#" + resource.row + "[" + resource.type + "] " + resource.url + "\r\n");
                         }
                     }
                     res.end();
