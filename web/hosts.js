@@ -54,8 +54,7 @@ void main(function () {
                 process.exit(4);
             }
 
-            var childSites = [];
-            db.getChildSites(siteId, childSites, function (err) {
+            db.getChildSites(siteId, function (err, childSites) {
 
                 if (err) {
                     log(err);

@@ -152,11 +152,12 @@ function getSiteIdByName(siteName, callback) {
     });
 }
 
-function getChildSites(siteId, childSites, callback) {
+function getChildSites(siteId, callback) {
 
     var siteTag;
     var siteName;
     var homepageUrl;
+    var childSites = [];
 
     var urlSet = new hashes.HashSet();
     var hostSet = new hashes.HashSet();
@@ -329,7 +330,7 @@ function getChildSites(siteId, childSites, callback) {
         }],
         function (err) {
 
-            callback(err, siteName);
+            callback(err, siteName,childSites);
         });
 }
 

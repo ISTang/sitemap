@@ -15,6 +15,7 @@ exports.StringTrim = StringTrim;
 //exports.md5 = md5;
 exports.contains = contains;
 exports.NumberFormat = NumberFormat;
+exports.makeDomainTree = makeDomainTree;
 
 const DATE_FORMAT_REGEX = /(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/g;
 
@@ -158,6 +159,38 @@ function NumberFormat(format) {
     return format.replace(/[d,?.?]+/, fnum);
 }
 
+// 子域名分析
+function makeDomainTree(siteName, hosts, callback) {
+    var reversedHosts = [];
+    var reversedHostIds = {};
+    for (var i in hosts) {
+        var host = hosts[i];
+        var reversedHost = host.name.split('.').reverse().join('.');
+        reversedHosts.push(reversedHost);
+        reversedHostIds[reversedHost] =  host.id;
+    }
+    reversedHosts.sort();
+    //
+    var root = {id: "root", name: siteName.split('.').reverse().join('.'), children:[]};
+    var nodeStack = [root];
+    begin:for (var j in reversedHosts) {
+        var reversedHost = reversedHosts[j];
+        var o = {id:reversedHostIds[reversedHost], name:reversedHost};
+        do {
+            var node = nodeStack.pop();
+            if (reversedHost.indexOf(node.name)==0) {
+                if (!node.children) node.children = [];
+                node.children.push(o);
+                nodeStack.push(node);
+                nodeStack.push(o);
+                break;
+            }
+        } while(nodeStack.length>0);
+    }
+    var childSites = nodeStack.shift().children;
+    callback(null, childSites);
+}
+
 function main(fn) {
     fn();
 }
@@ -174,4 +207,15 @@ void main(function () {
      console.log(aa);
      console.log(bb);
      console.log(''+a+','+b+','+(a-b)/1000);*/
+
+    var hosts = [
+        {id:1, name:'a.qq.com'},
+        {id:2, name:'a.b.qq.com'},
+        {id:3, name:'b.qq.com'},
+        {id:4, name:'a.b.c.qq.com'},
+        {id:5, name:'b.d.qq.com'}];
+    makeDomainTree('qq.com', hosts, function (err, tree) {
+        if (err) return console.log(err);
+        console.log(JSON.stringify(tree));
+    });
 });

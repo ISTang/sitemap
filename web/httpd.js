@@ -119,41 +119,12 @@ void main(function () {
                 });
             } else {
                 log("获取主站点 "+siteId+" 的子站点...");
-                var hosts = [];
-                db.getChildSites(siteId, hosts, function (err, siteName) {
-
-                    // 子域名分析
-                    var reversedHosts = [];
-                    var reversedHostIds = [];
-                    for (var i in hosts) {
-                        var host = hosts[i].name;
-                        var reversedHost = host.split('.').reverse().join('.');
-                        reversedHosts.push(reversedHost);
-                        reversedHostIds[reversedHost] =  hosts[i].id;
-                    }
-                    reversedHosts.sort();
-                    //
-                    var root = {id: "root", name: siteName.split('.').reverse().join('.'), children:[]};
-                    var nodeStack = [];
-                    nodeStack.push(root);
-                    for (var j in reversedHosts) {
-                        var reversedHost = reversedHosts[j];
-                        var o = {id:reversedHostIds[reversedHost], name:reversedHost};
-                        do {
-                            var node = nodeStack.pop();
-                            if (reversedHost.indexOf(node.name)==0) {
-                                if (!node.children) node.children = [];
-                                node.children.push(o);
-                                nodeStack.push(node);
-                                break;
-                            }
-                        } while(true);
-                    }
-                    var childSites = nodeStack.shift().children;
-
-                    res.setHeader("Content-Type", "application/json;charset=utf-8");
-                    if (err) res.json({children:[]});
-                    else res.json({children:childSites});
+                db.getChildSites(siteId, function (err, siteName, hosts) {
+                    utils.makeDomainTree(siteName, hosts, function (err, childSites) {
+                        res.setHeader("Content-Type", "application/json;charset=utf-8");
+                        if (err) res.json({children:[]});
+                        else res.json({children:childSites});
+                    });
                 });
             }
         });
