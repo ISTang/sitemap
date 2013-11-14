@@ -45,7 +45,7 @@ void main(function () {
         db.getSiteHosts(siteTag, siteName, function (err, hosts) {
             if (err) {
                 log(err);
-                return; //process.exit(3);
+                process.exit(3);
             }
 
             if (hosts) {
