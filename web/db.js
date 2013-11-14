@@ -223,54 +223,58 @@ function getSiteHosts(siteTag, siteName, callback, onCacheBuilt) {
                         },
                         function (callback) {
 
+                            log("从缓存获取站点 " + siteTag + " 的主机信息...");
+                            redis.smembers("site:" + siteTag + ":hosts", function (err, list) {
+
+                                if (err) return callback(err);
+
+                                hosts = [];
+                                for (var i in list) {
+
+                                    var host = list[i];
+                                    var o = {id: siteTag + ":" + host, name: host}
+                                    hosts.push(o);
+                                }
+
+                                callback();
+                            });
+                        },
+                        function (callback) {
+
+                            var rebuild = false;
                             if (exists) {
 
-                                if (lastPageCount >= pageCount) {
-
-                                    log("从缓存获取站点 " + siteTag + " 的主机信息...");
-                                    redis.smembers("site:" + siteTag + ":hosts", function (err, list) {
-
-                                        if (err) {
-                                            redisPool.release(redis);
-                                            return callback(err);
-                                        }
-
-                                        hosts = [];
-                                        for (var i in list) {
-
-                                            var host = list[i];
-                                            var o = {id: siteTag + ":" + host, name: host}
-                                            hosts.push(o);
-                                        }
-
-                                        return callback();
-                                    });
-                                } else {
+                                if (lastPageCount < pageCount) {
 
                                     log("需要为站点 " + siteTag + " 重建缓存");
+                                    rebuild = true;
                                 }
                             } else {
                                 log("需要为站点 " + siteTag + " 建立缓存");
                             }
 
-                            redis.get("site:" + siteTag + ":building_cache", function (err, buildingCache) {
+                            if (!exists || rebuild) {
+                                redis.get("site:" + siteTag + ":building_cache", function (err, buildingCache) {
 
-                                if (err) return callback(err);
-                                if (buildingCache==1) return callback("后台正在" + (exists ? "重建" : "建立") + "缓存，请稍后再试...");
+                                    if (err) return callback(err);
+                                    if (buildingCache==1) return callback("后台正在" + (exists ? "重建" : "建立") + "缓存，请稍后再试...");
 
-                                setTimeout(function () {
+                                    setTimeout(function () {
 
-                                    log("正在为站点 " + siteTag + (exists ? " 重建" : " 建立") + "缓存...");
-                                    makeSiteHosts(siteTag, homepageUrl, pageCount, function (err) {
+                                        log("正在为站点 " + siteTag + (exists ? " 重建" : " 建立") + "缓存...");
+                                        makeSiteHosts(siteTag, homepageUrl, pageCount, function (err) {
 
-                                        if (err) log(err);
-                                        else log("已经为站点 " + siteTag + (exists ? " 重建" : " 建立") + "缓存");
-                                        if (onCacheBuilt) onCacheBuilt(err);
-                                    });
-                                }, 100);
-                                if (onCacheBuilt) callback();
-                                else callback("后台开始" + (exists ? "重建" : "建立") + "缓存，请稍后再试...");
-                            });
+                                            if (err) log(err);
+                                            else log("已经为站点 " + siteTag + (exists ? " 重建" : " 建立") + "缓存");
+                                            if (onCacheBuilt) onCacheBuilt(err);
+                                        });
+                                    }, 1000);
+
+                                    callback("后台开始" + (exists ? "重建" : "建立") + "缓存，请稍后再试...");
+                                });
+                            } else {
+                                callback();
+                            }
                         }
                     ], function (err) {
 
