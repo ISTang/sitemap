@@ -77,7 +77,8 @@ function getMainSites(handleResult) {
 
             async.forEachSeries(sites, function (site, callback) {
 
-                    var siteId = site._id;
+                    var siteId = site._id.toString();
+                    var siteTag = site.tag;
                     var siteName = url.parse(site.url).hostname;
                     if (siteName.indexOf("www.") == 0) siteName = siteName.substring(4); // remove www. prefix
                     var homepageTitle;
@@ -100,7 +101,7 @@ function getMainSites(handleResult) {
                                 log("主站点 " + siteName + " 的首页标题: " + homepageTitle + "");
                             }
 
-                            var o = {id: siteId, name: siteName + "[" + (homepageTitle ? homepageTitle : "无首页信息") + "]", children: []};
+                            var o = {id: siteTag+":"+siteName, name: siteName + "[" + (homepageTitle ? homepageTitle : "无首页信息") + "]", children: []};
                             root.children.push(o);
 
                             callback();
