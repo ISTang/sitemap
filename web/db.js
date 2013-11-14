@@ -255,7 +255,7 @@ function getSiteHosts(siteTag, siteName, callback) {
                             redis.get("site:" + siteTag + ":building_cache", function (err, buildingCache) {
 
                                 if (err) return callback(err);
-                                if (buildingCache) return callback("后台正在" + (exists ? "重建" : "建立") + "缓存，请稍后再试...");
+                                if (buildingCache==1) return callback("后台正在" + (exists ? "重建" : "建立") + "缓存，请稍后再试...");
 
                                 setTimeout(function () {
 
