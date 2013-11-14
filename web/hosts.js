@@ -42,21 +42,21 @@ void main(function () {
         var siteTag = parseInt(process.argv[2], 10);
         var siteName = process.argv[3];
 
-        db.getChildSites(siteTag, siteName, function (err, childSites) {
+        db.getSiteHosts(siteTag, siteName, function (err, hosts) {
 
             if (err) {
                 log(err);
-                process.exit(3);
+                return; //process.exit(3);
             }
 
             log("站点 " + siteName + " 有以下子站点:");
-            for (var hostIndex in childSites) {
+            for (var hostIndex in hosts) {
 
-                var host = childSites[hostIndex];
+                var host = hosts[hostIndex];
                 log("[#" + (parseInt(hostIndex, 10) + 1) + "] " + host.name);
             }
 
-            process.exit(0);
+            //process.exit(0);
         });
     });
 });

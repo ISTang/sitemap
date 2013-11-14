@@ -237,7 +237,7 @@ function getSiteHosts(siteTag, siteName, callback) {
 
                                         for (var i in list) {
 
-                                            var host = hosts[i];
+                                            var host = list[i];
                                             var o = {id: siteTag + ":" + host, name: host}
                                             hosts.push(o);
                                         }
