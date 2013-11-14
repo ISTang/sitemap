@@ -43,20 +43,25 @@ void main(function () {
         var siteName = process.argv[3];
 
         db.getSiteHosts(siteTag, siteName, function (err, hosts) {
-
             if (err) {
                 log(err);
                 return; //process.exit(3);
             }
 
-            log("站点 " + siteName + " 有以下子站点:");
-            for (var hostIndex in hosts) {
+            if (hosts) {
+                log("站点 " + siteName + " 共有 " + hosts.length + " 个主机");
+                for (var hostIndex in hosts) {
 
-                var host = hosts[hostIndex];
-                log("[#" + (parseInt(hostIndex, 10) + 1) + "] " + host.name);
+                    var host = hosts[hostIndex];
+                    log("[#" + (parseInt(hostIndex, 10) + 1) + "] " + host.name);
+                }
+
+                process.exit(0);
             }
+        }, function (err) {
 
-            //process.exit(0);
+            if (err) log(err);
+            process.exit(0);
         });
     });
 });

@@ -153,10 +153,10 @@ function getSiteByName(siteName, callback) {
     });
 }
 
-function getSiteHosts(siteTag, siteName, callback) {
+function getSiteHosts(siteTag, siteName, callback, onCacheBuilt) {
 
     var homepageUrl;
-    var hosts = [];
+    var hosts;
 
     async.series([
         function (callback) {
@@ -235,6 +235,7 @@ function getSiteHosts(siteTag, siteName, callback) {
                                             return callback(err);
                                         }
 
+                                        hosts = [];
                                         for (var i in list) {
 
                                             var host = list[i];
@@ -262,13 +263,13 @@ function getSiteHosts(siteTag, siteName, callback) {
                                     log("正在为站点 " + siteTag + (exists ? " 重建" : " 建立") + "缓存...");
                                     makeSiteHosts(siteTag, homepageUrl, pageCount, function (err) {
 
-                                        if (err) return log(err);
-
-                                        log("已经为站点 " + siteTag + (exists ? " 重建" : " 建立") + "缓存");
+                                        if (err) log(err);
+                                        else log("已经为站点 " + siteTag + (exists ? " 重建" : " 建立") + "缓存");
+                                        if (onCacheBuilt) onCacheBuilt(err);
                                     });
                                 }, 100);
-
-                                callback("后台开始" + (exists ? "重建" : "建立") + "缓存，请稍后再试...");
+                                if (onCacheBuilt) callback();
+                                else callback("后台开始" + (exists ? "重建" : "建立") + "缓存，请稍后再试...");
                             });
                         }
                     ], function (err) {
