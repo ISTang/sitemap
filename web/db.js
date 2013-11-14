@@ -288,7 +288,7 @@ function getChildSites(siteId, callback) {
 
                                                     if (hostSet.contains(hostName)) return callback();
 
-                                                    if (!new RegExp('.*' + siteName + '$').test(hostName)) return callback();
+                                                    if (!new RegExp('.*?\\.' + siteName.replace('.', '\\.') + '$').test(hostName)) return callback();
                                                     //log("扫描到新的站点: " + hostName);
                                                     hostSet.add(hostName);
 
@@ -463,7 +463,7 @@ function scanChildPages(siteName, pageUrl, urlSet, hostSet, childSites, callback
     if (hostSet.contains(hostName)) {
 
         log("子页面 " + pageUrl + " 所属的主机已经存在");
-    } else if (!new RegExp('.*' + siteName + '$').test(hostName)) {
+    } else if (!new RegExp('.*?\\.' + siteName.replace('.', '\\.') + '$').test(hostName)) {
 
         log("主机 " + hostName + " 不属于站点 " + siteName);
 

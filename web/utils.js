@@ -110,7 +110,7 @@ function contains(substr, isIgnoreCase) {
  * @public
  */
 function NumberFormat(format) {
-    if (typeof format!=='string') {
+    if (typeof format !== 'string') {
         return '';
     } // sanity check
     var hasComma = -1 &lt; format.indexOf(','),
@@ -167,26 +167,34 @@ function makeDomainTree(siteName, hosts, callback) {
         var host = hosts[i];
         var reversedHost = host.name.split('.').reverse().join('.');
         reversedHosts.push(reversedHost);
-        reversedHostIds[reversedHost] =  host.id;
+        reversedHostIds[reversedHost] = host.id;
     }
     reversedHosts.sort();
     //
-    var root = {id: "root", name: siteName.split('.').reverse().join('.'), children:[]};
+    var root = {id: "root", name: siteName.split('.').reverse().join('.'), children: []};
     var nodeStack = [root];
+    var reversedNodes = [];
     begin:for (var j in reversedHosts) {
         var reversedHost = reversedHosts[j];
-        var o = {id:reversedHostIds[reversedHost], name:reversedHost};
+        var o = {id: reversedHostIds[reversedHost], name: reversedHost};
+        reversedNodes.push(o);
         do {
             var node = nodeStack.pop();
-            if (!node) return callback('Data error: '+JSON.stringify(hosts));
-            if (reversedHost.indexOf(node.name)==0) {
+            if (!node) {
+                return callback('Data error: ' + JSON.stringify(hosts));
+            }
+            if (reversedHost.indexOf(node.name) == 0) {
                 if (!node.children) node.children = [];
                 node.children.push(o);
                 nodeStack.push(node);
                 nodeStack.push(o);
                 break;
             }
-        } while(nodeStack.length>0);
+        } while (nodeStack.length > 0);
+    }
+    for (var k in reversedNodes) {
+        var reversedNode = reversedNodes[k];
+        reversedNode.name = reversedNode.name.split('.').reverse().join('.');
     }
     var childSites = nodeStack.shift().children;
     callback(null, childSites);
@@ -210,11 +218,11 @@ void main(function () {
      console.log(''+a+','+b+','+(a-b)/1000);*/
 
     /*var hosts = [
-        {id:1, name:'a.qq.com'},
-        {id:2, name:'a.b.qq.com'},
-        {id:3, name:'b.qq.com'},
-        {id:4, name:'a.b.c.qq.com'},
-        {id:5, name:'b.d.qq.com'}];
+     {id:1, name:'a.qq.com'},
+     {id:2, name:'a.b.qq.com'},
+     {id:3, name:'b.qq.com'},
+     {id:4, name:'a.b.c.qq.com'},
+     {id:5, name:'b.d.qq.com'}];
     makeDomainTree('qq.com', hosts, function (err, tree) {
         if (err) return console.log(err);
         console.log(JSON.stringify(tree));
