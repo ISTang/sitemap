@@ -165,7 +165,7 @@ function makeDomainTree(siteName, hosts, callback) {
     var reversedHostIds = {};
     for (var i in hosts) {
         var host = hosts[i];
-        if (new RegExp('.*?\\.' + siteName.replace('.', '\\.') + '$').test(host)) {
+        if (new RegExp('.*?\\.' + siteName.replace(/\./g, '\\.') + '$').test(host.name)) {
             var reversedHost = host.name.split('.').reverse().join('.');
             reversedHosts.push(reversedHost);
             reversedHostIds[reversedHost] = host.id;
@@ -219,7 +219,7 @@ void main(function () {
      console.log(bb);
      console.log(''+a+','+b+','+(a-b)/1000);*/
 
-    /*var hosts = [
+    var hosts = [
      {id:1, name:'a.qq.com'},
      {id:2, name:'a.b.qq.com'},
      {id:3, name:'b.qq.com'},
@@ -228,5 +228,5 @@ void main(function () {
     makeDomainTree('qq.com', hosts, function (err, tree) {
         if (err) return console.log(err);
         console.log(JSON.stringify(tree));
-    });*/
+    });
 });
