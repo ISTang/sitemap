@@ -53,7 +53,7 @@ void main(function () {
                 for (var hostIndex in hosts) {
 
                     var host = hosts[hostIndex];
-                    log("[#" + (parseInt(hostIndex, 10) + 1) + "] " + host.name);
+                    log("[#" + (parseInt(hostIndex, 10) + 1) + "] " + host.id + ": " + host.name);
                 }
 
                 utils.makeDomainTree(siteName, hosts, function (err, childSites) {
