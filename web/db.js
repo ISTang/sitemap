@@ -257,7 +257,7 @@ function getSiteHosts(siteTag, siteName, callback) {
                                 if (err) return callback(err);
                                 if (buildingCache) return callback("后台正在" + (exists ? "重建" : "建立") + "缓存，请稍后再试...");
 
-                                process.nextTick(function () {
+                                setTimeout(function () {
 
                                     log("正在为站点 " + siteTag + (exists ? " 重建" : " 建立") + "缓存...");
                                     makeSiteHosts(siteTag, homepageUrl, pageCount, function (err) {
@@ -266,7 +266,7 @@ function getSiteHosts(siteTag, siteName, callback) {
 
                                         log("已经为站点 " + siteTag + (exists ? " 重建" : " 建立") + "缓存");
                                     });
-                                });
+                                }, 100);
 
                                 callback("后台开始" + (exists ? "重建" : "建立") + "缓存，请稍后再试...");
                             });
