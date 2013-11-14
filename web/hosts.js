@@ -57,6 +57,8 @@ void main(function () {
                 }
 
                 process.exit(0);
+            } else {
+                log("正在建立/重建缓存，请稍后再试...");
             }
         }, function (err) {
 
