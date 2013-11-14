@@ -129,7 +129,7 @@ void main(function () {
                 }
                 var siteTag = parseInt(siteId.substring(0, pos), 10);
                 var siteName = siteId.substring(pos+1);
-                db.getChildSites(siteTag, siteName, function (err, hosts) {
+                db.getSiteHosts(siteTag, siteName, function (err, hosts) {
                     if (err) {
                         res.json({children: [{id: siteId+"_1", name: err}]});
                         return;                   
@@ -140,7 +140,7 @@ void main(function () {
                         else {
                             for (var i in childSites) {
                                 var childSite = childSites[i];
-                                childSite.children = [];
+                                if (childSite.children) childSite.children = [];
                             }
                         }
                         if (err) res.json({children: [{id: siteId+"_1", name: err}]});
