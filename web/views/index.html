@@ -65,7 +65,8 @@
             <div data-dojo-type="dijit/Tree"data-dojo-id="myTree" id="myTree"
                  data-dojo-props="model: sitesModel, persist: false, showRoot: false">
                 <script type="dojo/on" data-dojo-event="click" data-dojo-args="item, node, evt">
-                    siteName.set("content", "<strong>"+node.label+"</strong>");
+                    siteName.set("content", "站点 <strong>"+node.label+"</strong> 有问题的页面:");
+                    dojo.byId('doUrlSearch').click();
                 </script>
             </div>
         </div>
