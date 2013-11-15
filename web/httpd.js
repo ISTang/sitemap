@@ -150,8 +150,15 @@ void main(function () {
             }
         });
 
-        webapp.get('/failed_pages/:siteName', function (req, res) {
-            var siteName = req.params.siteName;
+        webapp.get('/failed_pages/:site_id', function (req, res) {
+            var siteId = req.params.site_id;
+            var pos = siteId.indexOf(":");
+            if (pos==-1) {
+                res.json({children:[{id: siteId+"_1", name: err}]});
+                return;
+            }
+            //var siteTag = parseInt(siteId.substring(0, pos), 10);
+            var siteName = siteId.substring(pos+1);
             var includeChildSites = req.query.includeChildSites === "false" ? false : true;
             var includedUrlString = req.query.includedUrlString ? querystring.unescape(req.query.includedUrlString) : "";
             var exportFile = req.query.export === "true" ? true : false;
