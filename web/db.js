@@ -380,6 +380,7 @@ function getFailedPages(siteName, includeChildSites, includedUrlString, callback
                 collection.find({url: new RegExp(siteName)}).toArray(function (err, pages) {
                     if (err) return callback(err);
                     if (!pages) return callback();
+                    debugger;
                     log("Found " + pages.length + " failed page(s).");
                     for (var i in pages) {
                         var page = pages[i];
