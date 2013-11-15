@@ -176,7 +176,7 @@ void main(function () {
                     } else {
                         for (var i in pages) {
                             var page = pages[i];
-                            res.write("#" + page.row + ": " + page.url + " [" + page.reason + "]\r\n");
+                            res.write(page.id + ": " + page.url + " [" + page.reason + "]\r\n");
                         }
                     }
                     res.end();

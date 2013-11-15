@@ -108,21 +108,35 @@
                                 "dojo/store/JsonRest",
                                 "dojo/store/Memory",
                                 "dojo/store/Cache",
-                                "dojox/grid/DataGrid",
+                                "dojox/grid/EnhancedGrid",
+                                "dojox/grid/enhanced/plugins/Pagination",
                                 "dojo/data/ObjectStore",
                                 "dojo/query",
                                 "dojo/domReady!"
-                            ], function(JsonRest, Memory, Cache, DataGrid, ObjectStore, query){
+                            ], function(JsonRest, Memory, Cache, EnhancedGrid, Pagination, ObjectStore, query){
                                 var myStore, dataStore, grid;
                                 myStore = new Cache(JsonRest({target:"/failed_pages/"+myTree.selectedItems[0].id+
-                                    "?includedUrlString="+escape(urlToSearch.value)}), new Memory());
-                                grid = new DataGrid({
+                                    "?includedUrlString="+escape(urlToSearch.value), idProperty: "Id"}),
+                                    new Memory({ idProperty: "Id" }));
+                                grid = new EnhancedGrid({
+                                    selectable: true,
                                     store: dataStore = new ObjectStore({objectStore: myStore}),
                                     structure: [
-                                        {name:"序号", field:"row", width: "32px"},
+                                        {name:"ID", field:"id", width: "32px"},
                                         {name:"URL", field:"url", width: "auto"},
                                         {name:"问题", field:"problem", width: "48px"}
-                                    ]
+                                    ],
+                                    rowSelector: '20px',
+                                    plugins: {
+                                        pagination: {
+                                            pageSizes: ["10", "25", "50", "100"],
+                                            description: true,
+                                            sizeSwitch: true,
+                                            pageStepper: true,
+                                            gotoButton: true,
+                                            maxPageStep: 5,
+                                            position: "bottom" }
+                                        }
                                     }, "urlTable"); // make sure you have a target HTML element with this id
                                 grid.startup();
                             });

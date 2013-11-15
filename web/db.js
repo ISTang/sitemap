@@ -383,7 +383,7 @@ function getFailedPages(siteName, includeChildSites, includedUrlString, callback
                     log("Found " + pages.length + " failed page(s).");
                     for (var i in pages) {
                         var page = pages[i];
-                        result.push({row: parseInt(i)+1, url: page.url, problem: page.reason});
+                        result.push({id: page._id.toString(), url: page.url, problem: page.reason});
                     }
                     callback();
                 });
