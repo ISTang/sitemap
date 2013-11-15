@@ -111,9 +111,9 @@
                                 "dojox/grid/EnhancedGrid",
                                 "dojox/grid/enhanced/plugins/Pagination",
                                 "dojo/data/ObjectStore",
-                                "dojo/query",
+                                "dojo/dom-attr",
                                 "dojo/domReady!"
-                            ], function(JsonRest, Memory, Cache, EnhancedGrid, Pagination, ObjectStore, query){
+                            ], function(JsonRest, Memory, Cache, EnhancedGrid, Pagination, ObjectStore){
                                 var myStore, dataStore, grid;
                                 myStore = new Cache(JsonRest({target:"/failed_pages/"+myTree.selectedItems[0].id+
                                     "?includedUrlString="+escape(urlToSearch.value), idProperty: "Id"}),
