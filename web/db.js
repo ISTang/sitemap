@@ -376,9 +376,10 @@ function getFailedPages(siteName, includeChildSites, includedUrlString, callback
         function (callback) {
             db.collection("failed", {safe: false}, function (err, collection) {
                 if (err) return callback(err);
-                log("Finding failed page from site " + siteName + "...");
+                log("Finding failed pages from site " + siteName + "...");
                 collection.find({url: new RegExp(siteName)}, function (err, pages) {
                     if (err) return callback(err);
+                    if (!pages) return callback();
                     log("Found " + pages.length + " failed page(s).");
                     for (var i in pages) {
                         var page = pages[i];

@@ -166,7 +166,7 @@ void main(function () {
                 if (!exportFile) {
                     res.setHeader("Content-Type", "application/json;charset=utf-8");
                     if (err) res.json([
-                        {id: 0, row: 1, url: err, type: "错误"}
+                        {id: 0, row: 1, url: err, reason: "错误"}
                     ]);
                     else res.json(pages);
                 } else {
