@@ -33,6 +33,24 @@ const MONGO_PORT = config.MONGO_PORT;
 //
 const LOG_ENABLED = config.LOG_ENABLED;
 
+const pageFetchErrors = {
+    "noDNS": "域名解析失败",
+    "noConnection": "无法连接服务器",
+    "forbiddenRobots": "服务器禁止爬虫访问",
+    "timeout": "服务器响应超时",
+    "badType": "文档类型错误",
+    "tooBig": "文档太大",
+    "err30X": "服务器返回 30X 状态码",
+    "err40X": "服务器返回 40X 状态码",
+    "earlyStop": "与服务器的连接被终止",
+    "duplicate": "页面内容重复",
+    "fastRobots": "服务器禁止爬虫访问(快速)",
+    "fastNoConn": "无法连接服务器(快速)",
+    "fastNoDns": "域名解析失败(快速)",
+    "tooDeep": "页面链接层次过深",
+    "urlDup": "页面地址重复"
+};
+
 var logStream = fs.createWriteStream("logs/db.log", {"flags": "a"});
 
 var redisPool;
@@ -393,7 +411,7 @@ function getFailedPages(siteName, includeChildSites, includedUrlString, range, c
                     log("Found " + pages.length + " failed page(s).");
                     for (var i in pages) {
                         var page = pages[i];
-                        result.push({id: page._id.toString(), url: page.url, problem: page.reason});
+                        result.push({id: page._id.toString(), url: page.url, problem: pageFetchErrors[page.reason]});
                     }
                     callback();
                 });
