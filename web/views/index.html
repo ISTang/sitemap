@@ -124,7 +124,7 @@
                                     structure: [
                                         {name:"ID", field:"id", width: "32px"},
                                         {name:"URL", field:"url", width: "auto"},
-                                        {name:"问题", field:"problem", width: "48px"}
+                                        {name:"问题", field:"problem", width: "96px"}
                                     ],
                                     rowSelector: '20px',
                                     plugins: {
@@ -150,34 +150,6 @@
              id="urlTableContainer">
             <div id="urlTable"></div>
        </div>
-        <div data-dojo-props="region: 'bottom'" id="urlActions"
-             data-dojo-type="dijit/layout/BorderContainer">
-            <div data-dojo-type="dijit/layout/ContentPane" id="unused_region"
-                 data-dojo-props="region: 'center'">
-            </div>
-            <div data-dojo-type="dijit/layout/ContentPane" id="exportUrls"
-                 data-dojo-props="region: 'right'">
-                <button data-dojo-type="dijit/form/Button" data-dojo-props="iconClass:'exportIcon', showLabel: false"
-                        id="doExportUrls" type="button">导出
-                    <script type="dojo/on" data-dojo-event="click" data-dojo-args="evt">
-                        if (!myTree.selectedItems[0]) return;
-
-                        var url = "/failed_pages/"+myTree.selectedItems[0].id+
-                            "?includedUrlString="+escape(urlToSearch.value))+"&export=true";
-
-                        if (dojo.isOpera) {
-                            dojo.io.iframe.send({
-                                url:url,
-                                timeout:4000
-                            });
-                        }
-                        else {
-                            dojo.create("iframe", {src: url , style: "display: none"}, dojo.doc.body);
-                        }
-                    </script>
-                </button>
-            </div>
-        </div>
     </div>
     <div data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region: 'bottom'"
          id="bottom" class="edgePanel">
