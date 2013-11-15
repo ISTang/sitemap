@@ -22,8 +22,7 @@ exports.openDatabase = openDatabase;
 exports.getMainSites = getMainSites;
 exports.getSiteByName = getSiteByName;
 exports.getSiteHosts = getSiteHosts;
-exports.getPages = getPages;
-//exports.getResources = getResources;
+exports.getFailedPages = getFailedPages;
 exports.countSite = countSite;
 
 const REDIS_SERVER = config.REDIS_SERVER;
@@ -257,7 +256,7 @@ function getSiteHosts(siteTag, siteName, callback, onCacheBuilt) {
                                 redis.get("site:" + siteTag + ":building_cache", function (err, buildingCache) {
 
                                     if (err) return callback(err);
-                                    if (buildingCache==1) return callback("后台正在" + (exists ? "重建" : "建立") + "缓存，请稍后再试...");
+                                    if (buildingCache == 1) return callback("后台正在" + (exists ? "重建" : "建立") + "缓存，请稍后再试...");
 
                                     setTimeout(function () {
 
@@ -269,7 +268,10 @@ function getSiteHosts(siteTag, siteName, callback, onCacheBuilt) {
                                             if (onCacheBuilt) onCacheBuilt(err);
                                         });
                                     }, 1000);
-                                    if (onCacheBuilt) { hosts = null; callback(); }
+                                    if (onCacheBuilt) {
+                                        hosts = null;
+                                        callback();
+                                    }
                                     else callback("后台开始" + (exists ? "重建" : "建立") + "缓存，请稍后再试...");
                                 });
                             } else {
@@ -366,71 +368,28 @@ function getSiteHosts(siteTag, siteName, callback, onCacheBuilt) {
 }
 
 /**
- * 获取页面信息
- * @param parentId
- * @param handleResult
+ * 获取有问题的页面信息
  */
-function getPages(parentId, handleResult) {
-    var pageUrl = null;
-    var pages = [];
+function getFailedPages(siteName, includeChildSites, includedUrlString, callback) {
+    var result = [];
     async.series([
         function (callback) {
-            db.collection("page", {safe: false}, function (err, collection) {
+            db.collection("failed", {safe: false}, function (err, collection) {
                 if (err) return callback(err);
-                log("Finding page with id " + parentId + "...");
-                collection.findOne({_id: new BSON.ObjectID(parentId)}, function (err, page) {
+                log("Finding failed page from site " + siteName + "...");
+                collection.find({url: new RegExp(siteName)}, function (err, pages) {
                     if (err) return callback(err);
-                    if (page != null) {
-                        log("Found " + page.url + "(" + page.title + ").");
-                        makeSiteTable(page.url, page.links_page, function (err, siteTable) {
-                            if (err) return callback(err);
-                            for (var i in siteTable) {
-                                pages.push({id: siteTable[i].key, name: siteTable[i].value, children: []});
-                            }
-                            callback();
-                        });
-                    } else {
-                        callback();
+                    log("Found " + pages.length + " failed page(s).");
+                    for (var i in pages) {
+                        result.push({row: parseInt(i)+1, url: page.url, reason: page.reason});
                     }
+                    callback();
                 });
             });
         }],
         function (err) {
-            handleResult(err, pages);
+            callback(err, result);
         });
-
-    function makeSiteTable(parentUrl, pageInfos, callback) {
-        var parentName = url.parse(parentUrl).hostname;
-        var hashTable = new hashes.HashTable();
-        var hashSet = new hashes.HashSet();
-        async.forEachSeries(pageInfos, function (pageInfo, callback) {
-                var siteName = url.parse(pageInfo.url).hostname;
-                if (parentName == siteName || hashSet.contains(siteName)) return callback();
-                db.collection("page", {safe: false}, function (err, collection) {
-                    if (err) return callback(err);
-                    collection.findOne({url: pageInfo.url}, function (err, page) {
-                        if (err) return callback(err);
-                        if (page) {
-                            db.collection("site", {safe: false}, function (err, collection2) {
-                                if (err) return callback(err);
-                                collection2.findOne({url: new RegExp(siteName)}, function (err, site) {
-                                    if (err) return callback(err);
-                                    if (site) return callback();
-                                    hashTable.add(page._id, siteName + "[" + page.title + "]");
-                                    hashSet.add(siteName);
-                                    callback();
-                                });
-                            });
-                        } else {
-                            callback();
-                        }
-                    });
-                });
-            },
-            function (err) {
-                callback(err, hashTable.getKeyValuePairs());
-            });
-    }
 }
 
 function countSite(siteUrl, handleResult) {

@@ -150,26 +150,26 @@ void main(function () {
             }
         });
 
-        webapp.get('/resources/:pageId', function (req, res) {
-            var pageId = req.params.pageId;
-            var includeChildPages = req.query.includeChildPages === "true" ? true : false;
+        webapp.get('/failed_pages/:siteName', function (req, res) {
+            var siteName = req.params.siteName;
+            var includeChildSites = req.query.includeChildSites === "false" ? false : true;
             var includedUrlString = req.query.includedUrlString ? querystring.unescape(req.query.includedUrlString) : "";
             var exportFile = req.query.export === "true" ? true : false;
-            db.getResources(pageId, includeChildPages, includedUrlString, function (err, resources) {
+            db.getFailedPages(siteName, includeChildSites, includedUrlString, function (err, pages) {
                 if (!exportFile) {
                     res.setHeader("Content-Type", "application/json;charset=utf-8");
                     if (err) res.json([
                         {id: 0, row: 1, url: err, type: "错误"}
                     ]);
-                    else res.json(resources);
+                    else res.json(pages);
                 } else {
-                    res.setHeader("Content-Disposition", "attachment; filename=\"" + pageId + "\"");
+                    res.setHeader("Content-Disposition", "attachment; filename=\"" + siteName + "\"");
                     if (err) {
                         res.write(err);
                     } else {
-                        for (var i in resources) {
-                            var resource = resources[i];
-                            res.write("#" + resource.row + "[" + resource.type + "] " + resource.url + "\r\n");
+                        for (var i in pages) {
+                            var page = pages[i];
+                            res.write("#" + page.row + ": " + page.url + " [" + page.reason + "]\r\n");
                         }
                     }
                     res.end();

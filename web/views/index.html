@@ -114,14 +114,14 @@
                                 "dojo/domReady!"
                             ], function(JsonRest, Memory, Cache, DataGrid, ObjectStore, query){
                                 var myStore, dataStore, grid;
-                                myStore = new Cache(JsonRest({target:"/resources/"+myTree.selectedItems[0].id+
+                                myStore = new Cache(JsonRest({target:"/failed_pages/"+myTree.selectedItems[0].id+
                                     "?includedUrlString="+escape(urlToSearch.value)}), new Memory());
                                 grid = new DataGrid({
                                     store: dataStore = new ObjectStore({objectStore: myStore}),
                                     structure: [
                                         {name:"序号", field:"row", width: "32px"},
                                         {name:"URL", field:"url", width: "auto"},
-                                        {name:"类型", field:"type", width: "48px"}
+                                        {name:"原因", field:"reason", width: "48px"}
                                     ]
                                     }, "urlTable"); // make sure you have a target HTML element with this id
                                 grid.startup();
@@ -148,7 +148,7 @@
                     <script type="dojo/on" data-dojo-event="click" data-dojo-args="evt">
                         if (!myTree.selectedItems[0]) return;
 
-                        var url = "/resources/"+myTree.selectedItems[0].id+
+                        var url = "/failed_pages/"+myTree.selectedItems[0].id+
                             "?includedUrlString="+escape(urlToSearch.value))+"&export=true";
 
                         if (dojo.isOpera) {
