@@ -370,14 +370,24 @@ function getSiteHosts(siteTag, siteName, callback, onCacheBuilt) {
 /**
  * 获取有问题的页面信息
  */
-function getFailedPages(siteName, includeChildSites, includedUrlString, callback) {
+function getFailedPages(siteName, includeChildSites, includedUrlString, range, callback) {
+    var totalRecords;
     var result = [];
-    async.series([
-        function (callback) {
-            db.collection("failed", {safe: false}, function (err, collection) {
-                if (err) return callback(err);
+    db.collection("failed", {safe: false}, function (err, collection) {
+        if (err) return callback(err);
+        async.series([
+            function (callback) {
                 log("Finding failed pages from site " + siteName + "...");
-                collection.find({url: new RegExp(siteName)}).limit(100).toArray(function (err, pages) {
+                collection.count({url: new RegExp(siteName)}, function (err, count) {
+                    if (err) return callback(err);
+                    log("Total " + count + " failed page(s).");
+                    totalRecords = count;
+                    callback();
+                });
+            },
+            function (callback) {
+                log("Finding failed pages from site " + siteName + "...");
+                collection.find({url: new RegExp(siteName)}).skip(range.from).limit(range.to-range.from+1).toArray(function (err, pages) {
                     if (err) return callback(err);
                     if (!pages) return callback();
                     log("Found " + pages.length + " failed page(s).");
@@ -387,11 +397,12 @@ function getFailedPages(siteName, includeChildSites, includedUrlString, callback
                     }
                     callback();
                 });
-            });
-        }],
+            }
+        ],
         function (err) {
-            callback(err, result);
+            callback(err, totalRecords, result);
         });
+    });
 }
 
 function countSite(siteUrl, handleResult) {

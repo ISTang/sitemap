@@ -162,9 +162,20 @@ void main(function () {
             var includeChildSites = req.query.includeChildSites === "false" ? false : true;
             var includedUrlString = req.query.includedUrlString ? querystring.unescape(req.query.includedUrlString) : "";
             var exportFile = req.query.export === "true" ? true : false;
-            db.getFailedPages(siteName, includeChildSites, includedUrlString, function (err, pages) {
+
+            var range = req.headers["range"];
+            if (range) {
+                var indexOfDash = range.indexOf("-");
+                var indexOfEqual = range.indexOf("=");
+                var a = parseInt(range.substring(indexOfEqual+1, indexOfDash), 10);
+                var b = parseInt(range.substring(indexOfDash+1), 10);
+                range = {from:a, to:b}
+            }
+
+            db.getFailedPages(siteName, includeChildSites, includedUrlString, range, function (err, totalRecords, pages) {
                 if (!exportFile) {
                     res.setHeader("Content-Type", "application/json;charset=utf-8");
+                    res.setHeader("Content-Range", "items "+range.from+"-"+range.to+"/"+totalRecords);
                     if (err) res.json([
                         {id: 0, row: 1, url: err, reason: "错误"}
                     ]);
