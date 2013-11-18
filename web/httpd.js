@@ -157,6 +157,20 @@ void main(function () {
                 res.json({children:[{id: siteId+"_1", name: err}]});
                 return;
             }
+            //
+            var keys = Object.keys(req.query);
+            var sortBy = {};
+            for (var i in keys) {
+                var fieldName = keys[i]
+                if (/sort\([\s-].+\)/g.test(fieldName)) {
+                    var s = fieldName.substring(6, fieldName.length-1);
+                    if (s=='id') s = '_id';
+                    else if (s=='problem') s = 'reason';
+                    sortBy[s] = (fieldName.substr(5, 1)=="-"?-1:1);
+                    break;
+                }
+                
+            }
             //var siteTag = parseInt(siteId.substring(0, pos), 10);
             var siteName = siteId.substring(pos+1);
             var includeChildSites = req.query.includeChildSites === "false" ? false : true;
@@ -172,7 +186,7 @@ void main(function () {
                 range = {from:a, to:b}
             }
 
-            db.getFailedPages(siteName, includeChildSites, includedUrlString, range, function (err, totalRecords, pages) {
+            db.getFailedPages(siteName, includeChildSites, includedUrlString, range, sortBy, function (err, totalRecords, pages) {
                 if (!exportFile) {
                     res.setHeader("Content-Type", "application/json;charset=utf-8");
                     res.setHeader("Content-Range", "items "+range.from+"-"+range.to+"/"+totalRecords);

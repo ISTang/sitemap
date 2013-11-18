@@ -388,7 +388,7 @@ function getSiteHosts(siteTag, siteName, callback, onCacheBuilt) {
 /**
  * 获取有问题的页面信息
  */
-function getFailedPages(siteName, includeChildSites, includedUrlString, range, callback) {
+function getFailedPages(siteName, includeChildSites, includedUrlString, range, sortBy, callback) {
     var totalRecords;
     var result = [];
     db.collection("failed", {safe: false}, function (err, collection) {
@@ -405,7 +405,7 @@ function getFailedPages(siteName, includeChildSites, includedUrlString, range, c
             },
             function (callback) {
                 log("Finding failed pages from site " + siteName + "...");
-                collection.find({url: new RegExp(siteName)}).skip(range.from).limit(range.to-range.from+1).toArray(function (err, pages) {
+                collection.find({url: new RegExp(siteName)}).sort(sortBy).skip(range.from).limit(range.to-range.from+1).toArray(function (err, pages) {
                     if (err) return callback(err);
                     if (!pages) return callback();
                     log("Found " + pages.length + " failed page(s).");
