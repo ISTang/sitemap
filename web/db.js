@@ -22,6 +22,7 @@ exports.openDatabase = openDatabase;
 exports.getMainSites = getMainSites;
 exports.getSiteByName = getSiteByName;
 exports.getSiteHosts = getSiteHosts;
+exports.countFailedPages = countFailedPages;
 exports.getFailedPages = getFailedPages;
 exports.countSite = countSite;
 
@@ -118,10 +119,15 @@ function getMainSites(handleResult) {
                                 log("主站点 " + siteName + " 的首页标题: " + homepageTitle + "");
                             }
 
-                            var o = {id: siteTag + ":" + siteName, name: siteName + "[" + (homepageTitle ? homepageTitle : "无首页信息") + "]", children: []};
-                            root.children.push(o);
+                            countFailedPages(siteName, null, null, function (err, failedPageCount) {
 
-                            callback();
+                                if (err) return callback(err);
+
+                                var o = {id: siteTag + ":" + siteName, name: siteName + "[" + (homepageTitle ? homepageTitle : "无首页信息") + "](" + failedPageCount + ")", children: []};
+                                root.children.push(o);
+
+                                callback();
+                            });
                         });
                     });
                 },
@@ -386,6 +392,21 @@ function getSiteHosts(siteTag, siteName, callback, onCacheBuilt) {
 }
 
 /**
+ * 统计问题页面的数量
+ */
+function countFailedPages(siteName, includeChildSites, includedUrlString, callback) {
+    db.collection("failed", {safe: false}, function (err, collection) {
+        if (err) return callback(err);
+        log("Counting failed pages of site " + siteName + "...");
+        collection.count({url: new RegExp(siteName)}, function (err, count) {
+            if (err) return callback(err);
+            log("Total " + count + " failed page(s).");
+            callback(null, count);
+        });
+    });
+}
+
+/**
  * 获取有问题的页面信息
  */
 function getFailedPages(siteName, includeChildSites, includedUrlString, range, sortBy, callback) {
@@ -417,9 +438,9 @@ function getFailedPages(siteName, includeChildSites, includedUrlString, range, s
                 });
             }
         ],
-        function (err) {
-            callback(err, totalRecords, result);
-        });
+            function (err) {
+                callback(err, totalRecords, result);
+            });
     });
 }
 

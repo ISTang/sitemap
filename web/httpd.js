@@ -7,6 +7,7 @@
 var fs = require('fs');
 var express = require('express');
 var querystring = require("querystring");
+var async = require('async');
 //
 var config = require(__dirname + '/config');
 var utils = require(__dirname + '/utils');
@@ -123,28 +124,44 @@ void main(function () {
             } else {
                 log("获取站点 " + siteId + " 的子站点...");
                 var pos = siteId.indexOf(":");
-                if (pos==-1) {
-                    res.json({children:[{id: siteId+"_1", name: err}]});
+                if (pos == -1) {
+                    res.json({children: [
+                        {id: siteId + "_1", name: err}
+                    ]});
                     return;
                 }
                 var siteTag = parseInt(siteId.substring(0, pos), 10);
-                var siteName = siteId.substring(pos+1);
+                var siteName = siteId.substring(pos + 1);
                 db.getSiteHosts(siteTag, siteName, function (err, hosts) {
                     if (err) {
-                        res.json({children: [{id: siteId+"_1", name: err}]});
-                        return;                   
+                        res.json({children: [
+                            {id: siteId + "_1", name: err}
+                        ]});
+                        return;
                     }
 
                     utils.makeDomainTree(siteName, hosts, function (err, childSites) {
                         if (err) log(err);
                         else {
-                            for (var i in childSites) {
-                                var childSite = childSites[i];
-                                if (childSite.children) childSite.children = [];
-                            }
+                            var result = [];
+                            async.forEachSeries(childSites, function (childSite, callback) {
+                                    db.countFailedPages(childSite.name, null, null, function (err, failedPageCount) {
+                                       if (err) return callback(err);
+                                        if (failedPageCount>0) {
+                                            childSite.name += "("+failedPageCount+")";
+                                            if (childSite.children) childSite.children = [];
+                                            result.push(childSite);
+                                        }
+                                        callback();
+                                    });
+                                }, function (err) {
+                                    if (err) res.json({children: [
+                                        {id: siteId + "_1", name: err}
+                                    ]});
+                                    else res.json({children: result});
+                                }
+                            );
                         }
-                        if (err) res.json({children: [{id: siteId+"_1", name: err}]});
-                        else res.json({children: childSites});
                     });
                 });
             }
@@ -153,8 +170,10 @@ void main(function () {
         webapp.get('/failed_pages/:site_id', function (req, res) {
             var siteId = req.params.site_id;
             var pos = siteId.indexOf(":");
-            if (pos==-1) {
-                res.json({children:[{id: siteId+"_1", name: err}]});
+            if (pos == -1) {
+                res.json({children: [
+                    {id: siteId + "_1", name: err}
+                ]});
                 return;
             }
             //
@@ -163,16 +182,16 @@ void main(function () {
             for (var i in keys) {
                 var fieldName = keys[i]
                 if (/sort\([\s-].+\)/g.test(fieldName)) {
-                    var s = fieldName.substring(6, fieldName.length-1);
-                    if (s=='id') s = '_id';
-                    else if (s=='problem') s = 'reason';
-                    sortBy[s] = (fieldName.substr(5, 1)=="-"?-1:1);
+                    var s = fieldName.substring(6, fieldName.length - 1);
+                    if (s == 'id') s = '_id';
+                    else if (s == 'problem') s = 'reason';
+                    sortBy[s] = (fieldName.substr(5, 1) == "-" ? -1 : 1);
                     break;
                 }
-                
+
             }
             //var siteTag = parseInt(siteId.substring(0, pos), 10);
-            var siteName = siteId.substring(pos+1);
+            var siteName = siteId.substring(pos + 1);
             var includeChildSites = req.query.includeChildSites === "false" ? false : true;
             var includedUrlString = req.query.includedUrlString ? querystring.unescape(req.query.includedUrlString) : "";
             var exportFile = req.query.export === "true" ? true : false;
@@ -181,15 +200,15 @@ void main(function () {
             if (range) {
                 var indexOfDash = range.indexOf("-");
                 var indexOfEqual = range.indexOf("=");
-                var a = parseInt(range.substring(indexOfEqual+1, indexOfDash), 10);
-                var b = parseInt(range.substring(indexOfDash+1), 10);
-                range = {from:a, to:b}
+                var a = parseInt(range.substring(indexOfEqual + 1, indexOfDash), 10);
+                var b = parseInt(range.substring(indexOfDash + 1), 10);
+                range = {from: a, to: b}
             }
 
             db.getFailedPages(siteName, includeChildSites, includedUrlString, range, sortBy, function (err, totalRecords, pages) {
                 if (!exportFile) {
                     res.setHeader("Content-Type", "application/json;charset=utf-8");
-                    res.setHeader("Content-Range", "items "+range.from+"-"+range.to+"/"+totalRecords);
+                    res.setHeader("Content-Range", "items " + range.from + "-" + range.to + "/" + totalRecords);
                     if (err) res.json([
                         {id: 0, row: 1, url: err, reason: "错误"}
                     ]);
