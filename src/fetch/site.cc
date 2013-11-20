@@ -270,7 +270,7 @@ void NamedSite::newQuery() {
  */
 void NamedSite::dnsAns(adns_answer *ans) {
 	if (ans->status == adns_s_prohibitedcname) {
-		if (cname == NULL) {
+		//if (cname == NULL) {
 			// try to find ip for cname of cname
 			cname = newString(ans->cname);
 			global::nbDnsCalls++;
@@ -283,20 +283,20 @@ void NamedSite::dnsAns(adns_answer *ans) {
 			//
 			adns_submit(global::ads, cname, (adns_rrtype) adns_r_addr,
 					(adns_queryflags) 0, this, &quer);
-		} else {
-			// dns chains too long => dns error
-			// cf nslookup or host for more information
-			outputDetails(DOMAIN_TARGET, name, DOMAIN_ERROR, "DNS链过长");
-			//char buf[512];
-			//sprintf(buf, "域名 %s 解析查询失败: DNS链过长[%ld]", name, global::now);
-			//syslog(LOG_WARNING, buf);
-			//
-			siteSeen();
-			delete[] cname;
-			cname = NULL;
-			dnsState = errorDns;
-			dnsErr();
-		}
+		//} else {
+		//	// dns chains too long => dns error
+		//	// cf nslookup or host for more information
+		//	outputDetails(DOMAIN_TARGET, name, DOMAIN_ERROR, "DNS链过长");
+		//	//char buf[512];
+		//	//sprintf(buf, "域名 %s 解析查询失败: DNS链过长[%ld]", name, global::now);
+		//	//syslog(LOG_WARNING, buf);
+		//	//
+		//	siteSeen();
+		//	delete[] cname;
+		//	cname = NULL;
+		//	dnsState = errorDns;
+		//	dnsErr();
+		//}
 	} else {
 		siteSeen();
 		if (cname != NULL) {
