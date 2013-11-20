@@ -35,22 +35,29 @@ const MONGO_PORT = config.MONGO_PORT;
 const LOG_ENABLED = config.LOG_ENABLED;
 
 const pageFetchErrors = {
-    "noDNS": "域名解析失败",
-    "noConnection": "无法连接服务器",
-    "forbiddenRobots": "服务器禁止爬虫访问",
-    "timeout": "服务器响应超时",
-    "badType": "文档类型错误",
-    "tooBig": "文档太大",
-    "err30X": "服务器返回 30X 状态码",
-    "err40X": "服务器返回 40X 状态码",
-    "earlyStop": "与服务器的连接被终止",
-    "duplicate": "页面内容重复",
-    "fastRobots": "服务器禁止爬虫访问(快速)",
-    "fastNoConn": "无法连接服务器(快速)",
-    "fastNoDns": "域名解析失败(快速)",
-    "tooDeep": "页面链接层次过深",
-    "urlDup": "页面地址重复"
+    "noDNS": {desc:"域名解析失败", output:1},
+    "noConnection": {desc:"无法连接服务器", output:1},
+    "forbiddenRobots": {desc:"服务器禁止爬虫访问", output:0},
+    "timeout": {desc:"服务器响应超时", output:1},
+    "badType": {desc:"文档类型错误", output:0},
+    "tooBig": {desc:"文档太大", output:0},
+    "err30X": {desc:"服务器返回 30X 状态码", output:0},
+    "err40X": {desc:"服务器返回 40X 状态码", output:1},
+    "earlyStop": {desc:"与服务器的连接被终止", output:1},
+    "duplicate": {desc:"页面内容重复", output:0},
+    "fastRobots": {desc:"服务器禁止爬虫访问(快速)", output:0},
+    "fastNoConn": {desc:"无法连接服务器(快速)", output:1},
+    "fastNoDns": {desc:"域名解析失败(快速)", output:1},
+    "tooDeep": {desc:"页面链接层次过深", output:0},
+    "urlDup": {desc:"页面地址重复", output:0}
 };
+
+var pageFetchErrorValues = [];
+for (var key in Object.keys(pageFetchErrors)) {
+	var pageFetchError = pageFetchErrors[key];
+	if (pageFetchError.output==1)
+		pageFetchErrorValues.push(key);
+}
 
 var logStream = fs.createWriteStream("logs/db.log", {"flags": "a"});
 
@@ -426,13 +433,13 @@ function getFailedPages(siteName, includeChildSites, includedUrlString, range, s
             },
             function (callback) {
                 log("Finding failed pages from site " + siteName + "...");
-                collection.find({url: new RegExp(siteName)}).sort(sortBy).skip(range.from).limit(range.to-range.from+1).toArray(function (err, pages) {
+                collection.find({url: new RegExp(siteName), reason:{$in:pageFetchErrorValues}}).sort(sortBy).skip(range.from).limit(range.to-range.from+1).toArray(function (err, pages) {
                     if (err) return callback(err);
                     if (!pages) return callback();
                     log("Found " + pages.length + " failed page(s).");
                     for (var i in pages) {
                         var page = pages[i];
-                        result.push({id: page._id.toString(), url: page.url, problem: pageFetchErrors[page.reason]});
+                        result.push({id: page._id.toString(), url: page.url, problem: pageFetchErrors[page.reason].desc});
                     }
                     callback();
                 });
