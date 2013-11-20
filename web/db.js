@@ -53,7 +53,9 @@ const pageFetchErrors = {
 };
 
 var pageFetchErrorValues = [];
-for (var key in Object.keys(pageFetchErrors)) {
+var keys = Object.keys(pageFetchErrors);
+for (var keyIndex in keys) {
+        var key = keys[keyIndex];
 	var pageFetchError = pageFetchErrors[key];
 	if (pageFetchError.output==1)
 		pageFetchErrorValues.push(key);
