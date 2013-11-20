@@ -223,34 +223,43 @@ void NamedSite::newQuery() {
 		siteDNS();
 		// Get the robots.txt
 		dnsOK();
-	} else if (isdigit(name[0])) {
-		// 可能是IP地址
-		// the name already in numbers-and-dots notation
-		siteSeen();
-		// 检查是否是合法的IP地址
-		if (inet_aton(name, &addr)) {
-			// IP地址有效
-			// Yes, it is in numbers-and-dots notation
-			siteDNS();
-			// Get the robots.txt
-			dnsOK();
-		} else {
-			// No, it isn't : this site is a non sense
-			dnsState = errorDns;
-			dnsErr();
-		}
 	} else {
-		// 需要域名解析
-		// submit an adns query
-		outputDetails(DOMAIN_TARGET, name, DOMAIN_SUBMIT, NULL);
-		//char buf[512];
-		//sprintf(buf, "提交域名 %s 解析查询...[%ld]", name, global::now);
-		//syslog(LOG_INFO, buf);
-		//
-		global::nbDnsCalls++;
-		adns_query quer = NULL;
-		adns_submit(global::ads, name, (adns_rrtype) adns_r_addr,
-				(adns_queryflags) 0, this, &quer);
+		bool isIP = true;
+		char *pName = &name[0];
+		while (*pName!='\0') {
+			if (*pName!='.' && !isdigit(*pName)) {
+				isIP = false;
+			}
+		}
+		if (isIP) {
+			// 是IP地址
+			// the name already in numbers-and-dots notation
+			siteSeen();
+			// 检查是否是合法的IP地址
+			if (inet_aton(name, &addr)) {
+				// IP地址有效
+				// Yes, it is in numbers-and-dots notation
+				siteDNS();
+				// Get the robots.txt
+				dnsOK();
+			} else {
+				// No, it isn't : this site is a non sense
+				dnsState = errorDns;
+				dnsErr();
+			}
+		} else {
+			// 需要域名解析
+			// submit an adns query
+			outputDetails(DOMAIN_TARGET, name, DOMAIN_SUBMIT, NULL);
+			//char buf[512];
+			//sprintf(buf, "提交域名 %s 解析查询...[%ld]", name, global::now);
+			//syslog(LOG_INFO, buf);
+			//
+			global::nbDnsCalls++;
+			adns_query quer = NULL;
+			adns_submit(global::ads, name, (adns_rrtype) adns_r_addr,
+					(adns_queryflags) 0, this, &quer);
+		}
 	}
 }
 
