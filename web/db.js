@@ -407,7 +407,7 @@ function countFailedPages(siteName, includeChildSites, includedUrlString, callba
     db.collection("failed", {safe: false}, function (err, collection) {
         if (err) return callback(err);
         log("Counting failed pages of site " + siteName + "...");
-        collection.count({url: new RegExp(siteName)}, function (err, count) {
+        collection.count({url: new RegExp(siteName), reason:{$in:pageFetchErrorValues}}, function (err, count) {
             if (err) return callback(err);
             log("Total " + count + " failed page(s).");
             callback(null, count);
@@ -426,7 +426,7 @@ function getFailedPages(siteName, includeChildSites, includedUrlString, range, s
         async.series([
             function (callback) {
                 log("Finding failed pages from site " + siteName + "...");
-                collection.count({url: new RegExp(siteName)}, function (err, count) {
+                collection.count({url: new RegExp(siteName), reason:{$in:pageFetchErrorValues}}, function (err, count) {
                     if (err) return callback(err);
                     log("Total " + count + " failed page(s).");
                     totalRecords = count;
