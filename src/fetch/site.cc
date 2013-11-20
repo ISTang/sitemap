@@ -229,7 +229,9 @@ void NamedSite::newQuery() {
 		while (*pName!='\0') {
 			if (*pName!='.' && !isdigit(*pName)) {
 				isIP = false;
+				break;
 			}
+			++pName;
 		}
 		if (isIP) {
 			// 是IP地址
