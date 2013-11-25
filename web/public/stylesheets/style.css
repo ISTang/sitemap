@@ -1,3 +1,4 @@
+
 ﻿* {
     outline: none !important;
     margin: 0;
@@ -130,7 +131,7 @@ html, body {
     color: #005FB3;
 }
 
-#siteName, #urlToSearch, #urlSearch {
+#siteName, #problemToSearch, #problemSearch {
     height: 24px;
     padding: 0;
     margin: 0;
@@ -163,7 +164,7 @@ html, body {
     border: 0;
 }
 
-#urlToSearch {
+#problemToSearch {
     height: 28px;
     background: transparent;
     background-image: url("../images/search_background.png");
@@ -174,7 +175,7 @@ html, body {
     overflow: hidden;
 }
 
-#txtUrlToSearch{
+#cmbProblemToSearch{
     height: 14px;
     background-color: white;
     margin-left: 0;

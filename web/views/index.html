@@ -1,4 +1,15 @@
 <% include header.html %>
+<script>
+var chartData = [
+    { x: 1, y: 19021 },
+    { x: 1, y: 12837 },
+    { x: 1, y: 12378 },
+    { x: 1, y: 21882 },
+    { x: 1, y: 17654 },
+    { x: 1, y: 15833 },
+    { x: 1, y: 16122 }
+];
+</script>
 
 <div data-dojo-type="dijit/layout/BorderContainer" data-dojo-props="design: 'headline'"
      id="appLayout">
@@ -32,7 +43,7 @@
                             var site = sites[i];
                             if (site.item.name.contains(txtSiteToFind.value, true)) {
                                 siteName.set("content", "<strong>"+site.item.name+"</strong>");
-                                myTree.set("paths", [["root", site.item.id]]).then(function(){myTree.focus()});
+                                myTree.set("paths", [["root", site.item.id]]).then(function(){myTree.focusNode(site)});
                                 break;
                             }
                         }
@@ -65,7 +76,7 @@
             <div data-dojo-type="dijit/Tree"data-dojo-id="myTree" id="myTree"
                  data-dojo-props="model: sitesModel, persist: false, showRoot: false">
                 <script type="dojo/on" data-dojo-event="click" data-dojo-args="item, node, evt">
-                    siteName.set("content", "站点 <strong>"+node.label+"</strong> 有问题的页面:");
+                    siteName.set("content", "站点 <strong>"+node.label+"</strong>:");
                     dojo.byId('doUrlSearch').click();
                 </script>
             </div>
@@ -89,11 +100,19 @@
                      data-dojo-props="region: 'left'"
                      style="margin-left: 0px">
                 </div>
-                <div data-dojo-type="dijit/layout/ContentPane" id="urlToSearch"
+                <div data-dojo-type="dijit/layout/ContentPane" id="problemToSearch"
                      data-dojo-props="region: 'center'">
-                    <input data-dojo-type="dijit/form/TextBox" data-dojo-id="urlToSearch" id="txtUrlToSearch"
-                           data-dojo-props="trim:true"
-                           type="text" value="" style="width: 220px;border: 0"/>
+                    <select data-dojo-type="dijit/form/Select" data-dojo-id="problemToSearch" id="cmbProblemToSearch"
+                           style="width: 220px;border: 0">
+                        <option value="" selected="selected">全部</option>
+                        <option value="noDNS">域名解析失败</option>
+                        <option value="noConnection">无法连接服务器</option>
+                        <option value="timeout">服务器响应超时</option>
+                        <option value="err40X">服务器返回 40X 状态码</option>
+                        <option value="earlyStop">与服务器的连接被终止</option>
+                        <!--<option value="fastNoConn">无法连接服务器(快速)</option> -->
+                        <!-- <option value="fastNoDns">域名解析失败(快速)</option> -->
+                    </select>
                 </div>
                 <div data-dojo-type="dijit/layout/ContentPane" id="urlSearch"
                      data-dojo-props="region: 'right'">
@@ -117,7 +136,7 @@
                             ], function(JsonRest, Memory, Cache, EnhancedGrid, Pagination, ObjectStore){
                                 var myStore, dataStore, grid;
                                 myStore = new Cache(JsonRest({target:"/failed_pages/"+myTree.selectedItems[0].id+
-                                    "?includedUrlString="+escape(urlToSearch.value), idProperty: "Id"}),
+                                    "?problem="+escape(problemToSearch.value), idProperty: "Id"}),
                                     new Memory({ idProperty: "Id" }));
                                 grid = new EnhancedGrid({
                                     selectable: true,
@@ -150,6 +169,19 @@
              data-dojo-props="region: 'center'"
              id="urlTableContainer">
             <div id="urlTable"></div>
+       </div>
+       <div data-dojo-type="dijit/layout/ContentPane"
+             data-dojo-props="region: 'bottom'"
+             id="chartContainer">
+<div
+    data-dojo-type="dojox/charting/widget/Chart"
+    data-dojo-props="theme:dojox.charting.themes.Claro" id="viewsChart" style="width: 550px; height: 200px;">
+
+    <div class="plot" name="default" type="Pie" radius="160" fontColor="#000" labelOffset="-20"></div>
+
+    <div class="series" name="Last Week's Visits" array="chartData"></div>
+</div>
+
        </div>
     </div>
     <div data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region: 'bottom'"

@@ -128,7 +128,7 @@ function getMainSites(handleResult) {
                                 log("主站点 " + siteName + " 的首页标题: " + homepageTitle + "");
                             }
 
-                            countFailedPages(siteName, null, null, function (err, failedPageCount) {
+                            countFailedPages(siteName, null, "", function (err, failedPageCount) {
 
                                 if (err) return callback(err);
 
@@ -403,11 +403,11 @@ function getSiteHosts(siteTag, siteName, callback, onCacheBuilt) {
 /**
  * 统计问题页面的数量
  */
-function countFailedPages(siteName, includeChildSites, includedUrlString, callback) {
+function countFailedPages(siteName, includeChildSites, problem, callback) {
     db.collection("failed", {safe: false}, function (err, collection) {
         if (err) return callback(err);
         log("Counting failed pages of site " + siteName + "...");
-        collection.count({url: new RegExp(siteName), reason:{$in:pageFetchErrorValues}}, function (err, count) {
+        collection.count({url: new RegExp(siteName), reason:(problem!=""?problem:{$in:pageFetchErrorValues})}, function (err, count) {
             if (err) return callback(err);
             log("Total " + count + " failed page(s).");
             callback(null, count);
@@ -418,7 +418,7 @@ function countFailedPages(siteName, includeChildSites, includedUrlString, callba
 /**
  * 获取有问题的页面信息
  */
-function getFailedPages(siteName, includeChildSites, includedUrlString, range, sortBy, callback) {
+function getFailedPages(siteName, includeChildSites, problem, range, sortBy, callback) {
     var totalRecords;
     var result = [];
     db.collection("failed", {safe: false}, function (err, collection) {
@@ -426,7 +426,7 @@ function getFailedPages(siteName, includeChildSites, includedUrlString, range, s
         async.series([
             function (callback) {
                 log("Finding failed pages from site " + siteName + "...");
-                collection.count({url: new RegExp(siteName), reason:{$in:pageFetchErrorValues}}, function (err, count) {
+                collection.count({url: new RegExp(siteName), reason:(problem!=""?problem:{$in:pageFetchErrorValues})}, function (err, count) {
                     if (err) return callback(err);
                     log("Total " + count + " failed page(s).");
                     totalRecords = count;
@@ -435,7 +435,7 @@ function getFailedPages(siteName, includeChildSites, includedUrlString, range, s
             },
             function (callback) {
                 log("Finding failed pages from site " + siteName + "...");
-                collection.find({url: new RegExp(siteName), reason:{$in:pageFetchErrorValues}}).sort(sortBy).skip(range.from).limit(range.to-range.from+1).toArray(function (err, pages) {
+                collection.find({url: new RegExp(siteName), reason:(problem!=""?problem:{$in:pageFetchErrorValues})}).sort(sortBy).skip(range.from).limit(range.to-range.from+1).toArray(function (err, pages) {
                     if (err) return callback(err);
                     if (!pages) return callback();
                     log("Found " + pages.length + " failed page(s).");

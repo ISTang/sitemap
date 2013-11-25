@@ -193,7 +193,7 @@ void main(function () {
             //var siteTag = parseInt(siteId.substring(0, pos), 10);
             var siteName = siteId.substring(pos + 1);
             var includeChildSites = req.query.includeChildSites === "false" ? false : true;
-            var includedUrlString = req.query.includedUrlString ? querystring.unescape(req.query.includedUrlString) : "";
+            var problem = req.query.problem ? querystring.unescape(req.query.problem) : "";
             var exportFile = req.query.export === "true" ? true : false;
 
             var range = req.headers["range"];
@@ -205,7 +205,7 @@ void main(function () {
                 range = {from: a, to: b}
             }
 
-            db.getFailedPages(siteName, includeChildSites, includedUrlString, range, sortBy, function (err, totalRecords, pages) {
+            db.getFailedPages(siteName, includeChildSites, problem, range, sortBy, function (err, totalRecords, pages) {
                 if (!exportFile) {
                     res.setHeader("Content-Type", "application/json;charset=utf-8");
                     res.setHeader("Content-Range", "items " + range.from + "-" + range.to + "/" + totalRecords);
