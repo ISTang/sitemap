@@ -11,14 +11,14 @@
     <link rel="stylesheet" type="text/css" href="stylesheets/style.css" media="screen"/>
     <script src="javascript/utils.js" type="text/javascript"></script>
     <script src="libs/dojo/1.8.3/dojo/dojo.js"
-            data-dojo-config="async:true, parseOnLoad:true,gfxRenderer: 'svg,silverlight,vml'">
+            data-dojo-config="async:true, parseOnLoad:true,gfxRenderer: 'svg,canvas,silverlight,vml'">
     </script>
     <script>
         require(["dojo/parser", "dijit/layout/BorderContainer", "dijit/layout/ContentPane",
             "dijit/form/TextBox", "dijit/form/Select", "dijit/form/Button", "dijit/form/CheckBox",
             "dojo/store/JsonRest", "dijit/tree/ObjectStoreModel",
             "dijit/Tree", "dojox/grid/DataGrid",
-            "dojox/charting/Chart", "dojox/charting/themes/Claro"]);
+            "dojox/charting/Chart", "dojox/charting/themes/Claro", "dojo/domReady!"]);
     </script>
 </head>
 <body class="claro">

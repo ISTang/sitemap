@@ -216,8 +216,18 @@ html, body {
     border: 0;
 }
 
+#urlTableContainer {
+    overflow: hidden;
+}
+
 #urlTable.dojoxGridCell {
     border-color: #C4C4C4;
+}
+
+#chartContainer {
+    width: 800px;
+    height: 200px;
+    overflow: hidden;
 }
 
 #bottom {
@@ -228,9 +238,4 @@ html, body {
     margin-top: 0;
     padding: 0;
     border: 0;
-}
-
-#viewsChart {
-    width: 550px;
-    height: 550px;
 }

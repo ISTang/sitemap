@@ -24,6 +24,7 @@ exports.getSiteByName = getSiteByName;
 exports.getSiteHosts = getSiteHosts;
 exports.countFailedPages = countFailedPages;
 exports.getFailedPages = getFailedPages;
+exports.statFailedPages = statFailedPages;
 exports.countSite = countSite;
 
 const REDIS_SERVER = config.REDIS_SERVER;
@@ -35,21 +36,21 @@ const MONGO_PORT = config.MONGO_PORT;
 const LOG_ENABLED = config.LOG_ENABLED;
 
 const pageFetchErrors = {
-    "noDNS": {desc:"域名解析失败", output:1},
-    "noConnection": {desc:"无法连接服务器", output:1},
-    "forbiddenRobots": {desc:"服务器禁止爬虫访问", output:0},
-    "timeout": {desc:"服务器响应超时", output:1},
-    "badType": {desc:"文档类型错误", output:0},
-    "tooBig": {desc:"文档太大", output:0},
-    "err30X": {desc:"服务器返回 30X 状态码", output:0},
-    "err40X": {desc:"服务器返回 40X 状态码", output:1},
-    "earlyStop": {desc:"与服务器的连接被终止", output:1},
-    "duplicate": {desc:"页面内容重复", output:0},
-    "fastRobots": {desc:"服务器禁止爬虫访问(快速)", output:0},
-    "fastNoConn": {desc:"无法连接服务器(快速)", output:1},
-    "fastNoDns": {desc:"域名解析失败(快速)", output:1},
-    "tooDeep": {desc:"页面链接层次过深", output:0},
-    "urlDup": {desc:"页面地址重复", output:0}
+    "noDNS": {desc:"域名解析失败", output:1, color: "#FF0000"},
+    "noConnection": {desc:"无法连接服务器", output:1, color: "#F80000"},
+    "forbiddenRobots": {desc:"服务器禁止爬虫访问", output:0, color: "#F00000"},
+    "timeout": {desc:"服务器响应超时", output:1, color: "#E80000"},
+    "badType": {desc:"文档类型错误", output:0, color: "#E00000"},
+    "tooBig": {desc:"文档太大", output:0, color: "#D80000"},
+    "err30X": {desc:"服务器返回 30X 状态码", output:0, color: "#D00000"},
+    "err40X": {desc:"服务器返回 40X 状态码", output:1, color: "#C80000"},
+    "earlyStop": {desc:"与服务器的连接被终止", output:1, color: "#C00000"},
+    "duplicate": {desc:"页面内容重复", output:0, color: "#B80000"},
+    "fastRobots": {desc:"服务器禁止爬虫访问(快速)", output:0, color: "#B00000"},
+    "fastNoConn": {desc:"无法连接服务器(快速)", output:1, color: "#A80000"},
+    "fastNoDns": {desc:"域名解析失败(快速)", output:1, color: "#A00000"},
+    "tooDeep": {desc:"页面链接层次过深", output:0, color: "#980000"},
+    "urlDup": {desc:"页面地址重复", output:0, color: "#900000"}
 };
 
 var pageFetchErrorValues = [];
@@ -450,6 +451,19 @@ function getFailedPages(siteName, includeChildSites, problem, range, sortBy, cal
             function (err) {
                 callback(err, totalRecords, result);
             });
+    });
+}
+
+function statFailedPages(siteName, includeChildSites, callback) {
+    var result = [];
+    async.forEach(pageFetchErrorValues, function(problem, callback) {
+        countFailedPages(siteName, includeChildSites, problem, function (err, count) {
+            if (err) return callback(err);
+            result.push({title: pageFetchErrors[problem].desc, y:count, color:pageFetchErrors[problem].color});
+            callback();
+        });        
+    }, function(err) {
+        callback(err, result);
     });
 }
 

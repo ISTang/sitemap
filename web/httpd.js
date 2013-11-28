@@ -172,7 +172,7 @@ void main(function () {
             var pos = siteId.indexOf(":");
             if (pos == -1) {
                 res.json({children: [
-                    {id: siteId + "_1", name: err}
+                    {id: siteId + "_1", name: "Invalid site info."}
                 ]});
                 return;
             }
@@ -227,6 +227,21 @@ void main(function () {
                 }
             });
         });
+
+        webapp.get('/failed_pages_stat/:site_id', function (req, res) {
+            var siteId = req.params.site_id;
+            var pos = siteId.indexOf(":");
+            if (pos == -1) {
+                res.json({success: false, error: "Invalid site info."});
+                return;
+            }
+            var siteName = siteId.substring(pos + 1);
+            var includeChildSites = req.query.includeChildSites === "false" ? false : true;
+	    db.statFailedPages(siteName, includeChildSites, function (err, result) {
+                if (err) res.json({success: false, error: err});
+		else res.json(result);
+ 	    });
+	});
 
         webapp.listen(HTTPD_PORT);
         log('HTTPD process is running at port ' + HTTPD_PORT + '...');

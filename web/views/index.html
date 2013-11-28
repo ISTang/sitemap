@@ -1,15 +1,4 @@
 <% include header.html %>
-<script>
-var chartData = [
-    { x: 1, y: 19021 },
-    { x: 1, y: 12837 },
-    { x: 1, y: 12378 },
-    { x: 1, y: 21882 },
-    { x: 1, y: 17654 },
-    { x: 1, y: 15833 },
-    { x: 1, y: 16122 }
-];
-</script>
 
 <div data-dojo-type="dijit/layout/BorderContainer" data-dojo-props="design: 'headline'"
      id="appLayout">
@@ -28,7 +17,16 @@ var chartData = [
                  data-dojo-props="region: 'center'">
                 <input data-dojo-type="dijit/form/TextBox" id="txtSiteToFind"
                        data-dojo-props="trim:true"
-                       type="text" value="" style="background:transparent;height:20px;margin-top:3px;border:0"/>
+                       type="text" value="" style="background:transparent;height:20px;margin-top:3px;border:0">
+                    <script type="dojo/on" data-dojo-event="keypress" data-dojo-args="evt">
+                        require(["dojo/_base/event"], function(event){
+                            var charOrCode = evt.charCode || evt.keyCode;
+                            if (13 == charOrCode) {
+                                dojo.byId('doSiteFind').click();
+                            }
+                        });
+                    </script>
+		</input>
             </div>
             <div data-dojo-type="dijit/layout/ContentPane" id="siteFind"
                  data-dojo-props="region: 'right'">
@@ -131,9 +129,19 @@ var chartData = [
                                 "dojox/grid/EnhancedGrid",
                                 "dojox/grid/enhanced/plugins/Pagination",
                                 "dojo/data/ObjectStore",
+			        "dojox/charting/Chart",
+			        "dojox/charting/themes/Claro",
+			        "dojox/charting/plot2d/Pie",
+				"dojox/charting/action2d/MoveSlice",
+				"dojox/charting/action2d/Tooltip",
+				"dojox/charting/widget/Legend",
+				"dojox/charting/action2d/Magnify",
+				"dojo/dom-construct",
+				"dojo/request",
                                 "dojo/dom-attr",
+				"dojox/charting/axis2d/Default",
                                 "dojo/domReady!"
-                            ], function(JsonRest, Memory, Cache, EnhancedGrid, Pagination, ObjectStore){
+                            ], function(JsonRest, Memory, Cache, EnhancedGrid, Pagination, ObjectStore, Chart, theme, PiePlot, MoveSlice, Tooltip, Legend, Magnify, domConstruct, request){
                                 var myStore, dataStore, grid;
                                 myStore = new Cache(JsonRest({target:"/failed_pages/"+myTree.selectedItems[0].id+
                                     "?problem="+escape(problemToSearch.value), idProperty: "Id"}),
@@ -159,6 +167,47 @@ var chartData = [
                                         }
                                     }, "urlTable"); // make sure you have a target HTML element with this id
                                 grid.startup();
+
+
+                                domConstruct.empty("chartContainer");
+
+				request("/failed_pages_stat/"+myTree.selectedItems[0].id+"?problem="+escape(problemToSearch.value)).then(
+				        function(text){
+						var chartData = JSON.parse(text);
+
+					        theme.chart.fill= "white";
+					        theme.plotarea.fill = "white";
+
+					        var pieChart = new Chart("chartContainer");
+
+					        pieChart.setTheme(theme);
+					        pieChart.addPlot("default", {
+					            type: PiePlot, // our plot2d/Pie module reference as type value
+					            radius: 100,
+					            fontColor: "black",
+						    lables: true,
+					            labelOffset: -20
+					        });
+
+					        pieChart.addSeries("stat",chartData);
+						new Tooltip(pieChart, "default", {
+							text: function(o){
+								var total = 0;
+								chartData.forEach(function(slice){ total += slice.y; });
+							        return chartData[o.index].title+": "+(chartData[o.index].y/total*100).toFixed(1)+"%";
+							}
+						});
+						//new Magnify(pieChart, "default");
+
+					        pieChart.render();
+
+						new MoveSlice(pieChart, "default");
+						//new Legend({chart: pieChart}, "chartLegend");
+				        },
+				        function(error){
+			                	console.log("An error occurred: " + error);
+			        	}
+				);
                             });
                         </script>
                     </button>
@@ -169,20 +218,11 @@ var chartData = [
              data-dojo-props="region: 'center'"
              id="urlTableContainer">
             <div id="urlTable"></div>
-       </div>
-       <div data-dojo-type="dijit/layout/ContentPane"
+        </div>
+        <div data-dojo-type="dijit/layout/ContentPane"
              data-dojo-props="region: 'bottom'"
-             id="chartContainer">
-<div
-    data-dojo-type="dojox/charting/widget/Chart"
-    data-dojo-props="theme:dojox.charting.themes.Claro" id="viewsChart" style="width: 550px; height: 200px;">
-
-    <div class="plot" name="default" type="Pie" radius="160" fontColor="#000" labelOffset="-20"></div>
-
-    <div class="series" name="Last Week's Visits" array="chartData"></div>
-</div>
-
-       </div>
+             id="chartContainer" class="edgePanel">
+        </div>
     </div>
     <div data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region: 'bottom'"
          id="bottom" class="edgePanel">
